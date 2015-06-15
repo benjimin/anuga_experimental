@@ -741,16 +741,19 @@ inline int _flux_function_central(double* ql, double* qr,
       // Standard smoothing term
       // edgeflux[i] += 1.0*(s_max*s_min)*(q_right_rotated[i] - q_left_rotated[i]);
       // Smoothing by stage alone can cause high velocities / slow draining for nearly dry cells
-      //if(i==0) edgeflux[0] += (s_max*s_min)*(qr[0] - ql[0]);
-      //if(i==1) edgeflux[1] += (s_max*s_min)*(qr[1] - ql[1]);
-      //if(i==2) edgeflux[2] += (s_max*s_min)*(qr[2] - ql[2]);
-      edgeflux[i] += (s_max*s_min)*(qr[i] - ql[i]);
+      //if(i == 0){
+      //  edgeflux[0] += (s_max*s_min)*(qr[0] - ql[0]);
+      //}else{
+        //if(i==1) edgeflux[1] += (s_max*s_min)*(qr[1] - ql[1]);
+        //if(i==2) edgeflux[2] += (s_max*s_min)*(qr[2] - ql[2]);
+        edgeflux[i] += (s_max*s_min)*(qr[i] - ql[i]);
+      //}
       edgeflux[i] *= inverse_denominator;
 
     }
 
    // Rotate edgeflux back to x,y coordinate system
-   _rotate(edgeflux,n1, -n2);
+   _rotate(edgeflux, n1, -n2);
 
     // Separate pressure flux, so we can apply different wet-dry hacks to it
     *pressure_flux = 0.5*g*(s_max*ql[6] -s_min*qr[6])*inverse_denominator;
@@ -1058,10 +1061,20 @@ inline int _get_rotated_subgrid_edge_quantities(
     // ql[6] = integral(h^2)                           = integrated version of h^2
     // ql[7] = 0             (was useful in another context)
     // ql[8] = edge_length
+    //
+    // @param ql array to fill
+    // @param ck centroid k index used for lookup table
+    // @param ei edge index (corresponding to centroid k index) used for lookup table
+    // @param eki edge index (in the form 3*k + i) of the edge being interpolated at. 
+    // @param D domain struct
+    // @param stage_left The 'audusse adjusted' stage_left
+    // @param stage_le The non-audusse-adjusted stage left
+    // @param n1, n2 Normal vectors to the edge (pointing outward from 'left' edge)
 
     // Local vars
-    int inverse, var, use_last_lookup_info, use_last_cube_root, ki, i;
+    int inverse, var, use_last_lookup_info, use_last_cube_root, ki, i, k;
     double h_5on3n_integral, h_7on3n2_integral,u_scale, v_scale;
+    double tmp0, tmp1, tmp2;
     //double* lookup_table;
 
     // Check that interpolation x values are not NAN
@@ -1078,14 +1091,16 @@ inline int _get_rotated_subgrid_edge_quantities(
  
     inverse = 0;
 
-    ki = 3*ck + ei ;
+    k = (eki / 3) ;//3*ck + ei ;
+    i = eki - 3*k;
+    //printf("k,  %d, i, %d\n", k, i);
 
     // h integral
     var = 1;
     use_last_lookup_info = 0;
     use_last_cube_root = 0;
     //ql[0] = eval_subgrid_function(stage_left, ck, ei, var, inverse, D);
-    ql[0] = eval_subgrid_function(stage_le, ck, ei, var, inverse, D, 
+    ql[0] = eval_subgrid_function(stage_left, ck, ei, var, inverse, D, 
                                   use_last_lookup_info, use_last_cube_root) ;//,
                                   //lookup_table);
 
@@ -1105,7 +1120,7 @@ inline int _get_rotated_subgrid_edge_quantities(
         var = 2;
         //h_5on3n_integral = eval_subgrid_function(stage_left, ck, ei, var, inverse, D);
         use_last_lookup_info = 1; // Can reuse the lookup indices
-        h_5on3n_integral = eval_subgrid_function(stage_le, ck, ei, var, inverse, 
+        h_5on3n_integral = eval_subgrid_function(stage_left, ck, ei, var, inverse, 
                                                 D, use_last_lookup_info, use_last_cube_root); //, lookup_table);
         // uh integral
         ql[1]=h_5on3n_integral*u_scale;
@@ -1117,7 +1132,7 @@ inline int _get_rotated_subgrid_edge_quantities(
         var = 3;
         //h_7on3n2_integral = eval_subgrid_function(stage_left, ck, ei, var, inverse, D);
         use_last_cube_root = 1; // reuse cube-roots in interpolation weights
-        h_7on3n2_integral = eval_subgrid_function(stage_le, ck, ei, var, inverse, D, 
+        h_7on3n2_integral = eval_subgrid_function(stage_left, ck, ei, var, inverse, D, 
                                                 use_last_lookup_info, use_last_cube_root) ; //, lookup_table);
         use_last_cube_root = 0; // set back for safety
 
@@ -1131,18 +1146,44 @@ inline int _get_rotated_subgrid_edge_quantities(
         // h^2 integral
         var = 4;
         //ql[6] = eval_subgrid_function(stage_left, ck, ei, var, inverse, D);
-        ql[6] = eval_subgrid_function(stage_le, ck, ei, var, inverse, D, 
+        ql[6] = eval_subgrid_function(stage_left, ck, ei, var, inverse, D, 
                                       use_last_lookup_info, use_last_cube_root) ; //, lookup_table);
-        // h^2 integral value
+
+        // h^2 integral value on its own triangle
+        // This may not integrate to zero even for first order extrapolation,
+        // Since the bed might not be constant
         //ql[7] = eval_subgrid_function(stage_le, ck, ei, var, inverse, D);
-        //ql[7] = eval_subgrid_function(D->stage_centroid_values[ck], 
-        //                             ck, ei, var, inverse, D, use_last_lookup_info);
+        //use_last_lookup_info = 0;
+        //ql[7] = eval_subgrid_function(stage_le, k, i, var, inverse, D, 
+        //                              use_last_lookup_info, use_last_cube_root);
         ql[7] = 0.;
+
+        //tmp0 = eval_subgrid_function(stage_le, k, 0, var, inverse, D, 
+        //                              use_last_lookup_info, use_last_cube_root);
+
+        //tmp0 /= eval_subgrid_function(stage_le, k, 0, 0, inverse, D, 
+        //                              use_last_lookup_info, use_last_cube_root);
+
+
+        //tmp1 = eval_subgrid_function(stage_le, k, 1, var, inverse, D, 
+        //                              use_last_lookup_info, use_last_cube_root);
+        //
+        //tmp1 /= eval_subgrid_function(stage_le, k, 1, 0, inverse, D, 
+        //                              use_last_lookup_info, use_last_cube_root);
+
+        //tmp2 = eval_subgrid_function(stage_le, k, 2, var, inverse, D, 
+        //                              use_last_lookup_info, use_last_cube_root);
+
+        //tmp2 /= eval_subgrid_function(stage_le, k, 2, 0, inverse, D, 
+        //                              use_last_lookup_info, use_last_cube_root);
+
+        //printf("A: %e, B: %e, C: %e\n", tmp0, tmp1, tmp2);
+        ////ql[7] = 0.;
     }
 
     // Wet length
     var = 0;
-    ql[8] = eval_subgrid_function(stage_le, ck, ei, var, inverse, D, 
+    ql[8] = eval_subgrid_function(stage_left, ck, ei, var, inverse, D, 
                                 use_last_lookup_info, use_last_cube_root) ; //, lookup_table);
 
     return 0;
@@ -1185,6 +1226,10 @@ inline double _compute_fluxes_central(struct domain *D, double timestep){
     memset((char*) D->u_vol_semi_implicit_update, 0, D->number_of_elements * sizeof (double));
     memset((char*) D->v_vol_semi_implicit_update, 0, D->number_of_elements * sizeof (double));
 
+    // GD HACK
+    //if (call >= 2){
+    //    report_python_error(AT, "Deliberate halt");
+    //}
 
     // Counter for riverwall edges
     RiverWall_count = 0;
@@ -1372,17 +1417,17 @@ inline double _compute_fluxes_central(struct domain *D, double timestep){
 
                 // Get 'ql'
                 _get_rotated_subgrid_edge_quantities(ql, k, i, ki, D,
-                    sle - zl + zc, sle - zl + zc, D->normals[ki2], D->normals[ki2+1]);
+                    sle - zl + zc, sle, D->normals[ki2], D->normals[ki2+1]);
 
                 // Get 'qr'
                 if( n >= 0){
                     // Lookup from triangle k -- stage only from right side.
                     _get_rotated_subgrid_edge_quantities(qr, k, i, nm, D,
-                        sre - zl + zc, sre - zl + zc, D->normals[ki2], D->normals[ki2+1]);
+                        sre - zl + zc, sre, D->normals[ki2], D->normals[ki2+1]);
                 }else{
                     // Use 'left' values [qr = ql]
                     _get_rotated_subgrid_edge_quantities(qr, k, i, ki, D,
-                        sre - zl + zc, sre - zl + zc, D->normals[ki2], D->normals[ki2+1]);
+                        sre - zl + zc, sre, D->normals[ki2], D->normals[ki2+1]);
                 }
             }else{
                 // Use right hand side elevation / lookup function
@@ -1390,11 +1435,11 @@ inline double _compute_fluxes_central(struct domain *D, double timestep){
                 // Get 'ql'
                 // Lookup table from triangle n -- stage only from left side.
                 _get_rotated_subgrid_edge_quantities(ql, n, m, ki, D, 
-                    sle - zr + zc_n, sle - zr + zc_n, D->normals[ki2], D->normals[ki2+1]);
+                    sle - zr + zc_n, sle, D->normals[ki2], D->normals[ki2+1]);
 
                 // Get 'qr'
                 _get_rotated_subgrid_edge_quantities(qr, n, m, nm, D, 
-                    sre - zr + zc_n, sre - zr + zc_n, D->normals[ki2], D->normals[ki2+1]);
+                    sre - zr + zc_n, sre, D->normals[ki2], D->normals[ki2+1]);
             } 
             //////////////////////////////////////////////////////////
            
@@ -1415,12 +1460,14 @@ inline double _compute_fluxes_central(struct domain *D, double timestep){
 
             // Edge flux computation (triangle k, edge i)
             _flux_function_central(ql, qr, edgeflux, 
-                    D->normals[ki2],D->normals[ki2 + 1],
+                    D->normals[ki2], D->normals[ki2 + 1],
                     D->epsilon, D->g,
                     &max_speed_local, &pressure_flux, 
                     length, 
                     u_left, u_right, 
                     hl, hr);
+
+            //printf("k, %d, i, %d, hl , %e, hr, %e, fl, %e, %e, %e \n", k, i, hl, hr, edgeflux[0], edgeflux[1], edgeflux[2]);
 
             if(n < 0){
                 // ENFORCE REFLECTIVE BOUNDARY FOR NOW
@@ -1541,14 +1588,15 @@ inline double _compute_fluxes_central(struct domain *D, double timestep){
                 // Evaluate grad(w) using (limited) cell edge values (assuming
                 // a constant within-cell grad(w)), grad(h^2) using the cell
                 // audusse 'pressure gradient integrated over edges'.
-                ql[7] = (D->vol_centroid_values[k] / D->areas[k]) * sle * length  ;
-                bedslope_work = (D->g * (-0.5 * ql[6] + ql[7]) + pressure_flux);
+                tmp = (D->vol_centroid_values[k] / D->areas[k]) * sle * length  ;
+                bedslope_work = (D->g * ( tmp - 0.5 * ql[6]) + pressure_flux);
 
             }else{
                 bedslope_work = 0.;
 
             }
 
+            //printf("BWL: %e \n", bedslope_work);
             //// Valiani + Begnudelli approach
             //if(D->vol_centroid_values[k]>0.){
             //    bedslope_work=(- D->g*0.5*(ql[7])+pressure_flux);
@@ -1570,11 +1618,12 @@ inline double _compute_fluxes_central(struct domain *D, double timestep){
 
                 // Approach with subgrid topography
                 if(D->vol_centroid_values[n] > 0.){
-                    qr[7] = (D->vol_centroid_values[n] / D->areas[n]) * sre * length ;
-                    bedslope_work = ( D->g * ( -0.5 * qr[6] + qr[7]) + pressure_flux);
+                    tmp = (D->vol_centroid_values[n] / D->areas[n]) * sre * length ;
+                    bedslope_work = ( D->g * ( tmp - 0.5 * qr[6]) + pressure_flux);
                 }else{
                     bedslope_work = 0.;
                 }
+                //printf("BWR: %e \n", bedslope_work);
 
                 //
                 //// Valiani + Begnudelli approach

@@ -33,9 +33,9 @@ floodplain_width = 100.0 # Model domain width
 floodplain_slope = 1./300.
 chan_width = 5. # Bankfull width of the channel
 man_n = 0.03 # Manning's n
-l0 = 20. # Length scale associated with triangle side length in channel (min_triangle area = 0.5*l0^2)
+l0 = 50. # Length scale associated with triangle side length in channel (min_triangle area = 0.5*l0^2)
 
-initial_stage = 2.50
+initial_stage = 8.00
 
 flow_algorithm = 'DE_SG' # DE0 # DE1
 reference_gradient_type = 'zero' #'bed-slope' # 'zero'
@@ -134,7 +134,7 @@ if __name__ == '__main__':
             frictionFun,
             approx_grid_spacing = [1.0, 1.0],
             max_reference_depth = 20.0,
-            constant_subgrid_values = False,
+            constant_subgrid_values = True,
             reference_gradient_type = reference_gradient_type)
 
         # Set initial values for volume quantities

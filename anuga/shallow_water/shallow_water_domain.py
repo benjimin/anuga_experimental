@@ -792,11 +792,11 @@ class Domain(Generic_Domain):
         self.set_extrapolate_velocity()
        
         # Avoid limiter-chatter instability 
-        self.beta_w = 1.0
+        self.beta_w = 0.0
         self.beta_w_dry = 0.0
-        self.beta_uh = 1.0
+        self.beta_uh = 0.0
         self.beta_uh_dry = 0.0
-        self.beta_vh = 1.0
+        self.beta_vh = 0.0
         self.beta_vh_dry = 0.0
         
 
