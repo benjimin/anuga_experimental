@@ -21,7 +21,7 @@ AnuGA
 What is AnuGA?
 --------------
 
-AnuGA (pronounced "AHnooGAH" ) is open-source software for the simulation of
+AnuGA (pronounced "AHnooGAH") is open-source software for the simulation of
 the shallow water equation, in particular it can be used to model tsunamis
 and floods.
 
