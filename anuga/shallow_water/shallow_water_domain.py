@@ -326,6 +326,10 @@ class Domain(Generic_Domain):
         # extrapolation/flux updating is used) 
         self.allow_timestep_increase=num.zeros(1).astype(int)+1
 
+        ################################################################################
+        # subgrid testing        
+        self.subgrid_data=None
+
     def _set_config_defaults(self):
         """Set the default values in this routine. That way we can inherit class
         and just redefine the defaults for the new class
@@ -348,6 +352,8 @@ class Domain(Generic_Domain):
 
         # Early algorithms need elevation to remain continuous
         self.set_using_discontinuous_elevation(False)
+        # Early algorithms do not have subgrid topography
+        self.set_using_subgrid_algorithm(False)
 
         self.set_minimum_allowed_height(minimum_allowed_height)
         self.maximum_allowed_speed = maximum_allowed_speed
@@ -659,12 +665,12 @@ class Domain(Generic_Domain):
         self.set_default_order(2)
         self.set_extrapolate_velocity()
 
-        self.beta_w=1.0
-        self.beta_w_dry=0.0
-        self.beta_uh=1.0
-        self.beta_uh_dry=0.0
-        self.beta_vh=1.0
-        self.beta_vh_dry=0.0
+        self.beta_w = 1.0
+        self.beta_w_dry = 0.0
+        self.beta_uh = 1.0
+        self.beta_uh_dry = 0.0
+        self.beta_vh = 1.0
+        self.beta_vh_dry = 0.0
         
 
         #self.set_quantities_to_be_stored({'stage': 2, 'xmomentum': 2, 
@@ -727,7 +733,6 @@ class Domain(Generic_Domain):
         self.beta_uh_dry=0.0
         self.beta_vh=1.0
         self.beta_vh_dry=0.0
-        
 
         #self.set_quantities_to_be_stored({'stage': 2, 'xmomentum': 2, 
         #         'ymomentum': 2, 'elevation': 2, 'height':2})
@@ -754,6 +759,98 @@ class Domain(Generic_Domain):
             print '# Using discontinuous elevation solver DE3'
             print '#'
             print '# Using rk3 timestepping'
+            print '#'
+            print '# Make sure you use centroid values when reporting on important output quantities'
+            print '#'
+            print '##########################################################################'
+
+    def _set_DE_SG_defaults(self):
+        """
+           Set up the defaults for running the flow_algorithm "DE_SG"
+           A 'discontinuous elevation sub-grid topography' method
+
+           NOTE: The meaning of xmomentum, ymomentum has changed
+        """
+        from anuga.abstract_2d_finite_volumes.quantity import Quantity
+
+        self.set_CFL(0.9)
+        self.set_use_kinematic_viscosity(False)
+        #self.timestepping_method='rk2'#'rk3'#'euler'#'rk2' 
+        #self.set_timestepping_method('euler')
+        self.set_timestepping_method('rk2')
+        
+        self.set_using_discontinuous_elevation(True)
+        self.set_compute_fluxes_method('DE_SG')
+        self.set_distribute_to_vertices_and_edges_method('DE_SG')
+        
+        # Don't place any restriction on the minimum storable height
+        self.minimum_storable_height = -99999999999.0 
+        self.minimum_allowed_height = -9999999999.0 #1.0e-12
+
+        self.use_edge_limiter = True
+        self.set_default_order(2)
+        self.set_extrapolate_velocity()
+       
+        # Avoid limiter-chatter instability 
+        self.beta_w = 1.0
+        self.beta_w_dry = 0.0
+        self.beta_uh = 1.0
+        self.beta_uh_dry = 0.0
+        self.beta_vh = 1.0
+        self.beta_vh_dry = 0.0
+        
+
+        self.set_using_subgrid_algorithm(True)
+        self.set_using_discontinuous_elevation(True)
+        #self.set_quantities_to_be_stored({'stage': 2, 'xmomentum': 2, 
+        #         'ymomentum': 2, 'elevation': 2, 'height':2})
+        #self.set_quantities_to_be_stored({'stage': 2, 'xmomentum': 2, 
+        #         'ymomentum': 2, 'elevation': 1})
+        self.set_store_centroids(True)
+
+        self.optimise_dry_cells = False 
+
+        # We need the edge_coordinates for the extrapolation
+        self.edge_coordinates = self.get_edge_midpoint_coordinates()
+
+        # By default vertex values are NOT stored uniquely
+        # for storage efficiency. We may override this (but not so important since
+        # centroids are stored anyway
+        # self.set_store_vertices_smoothly(False)
+
+        self.maximum_allowed_speed = 0.0
+
+        # Set conserved quantities to be vol/x-velocity-volume/y-velocity-volume
+        self.conserved_quantities = ['vol', 'u_vol', 'v_vol']
+        for newQ in self.conserved_quantities:
+            Quantity(self, name=newQ, register=True)
+
+        # Set quantities to store the 'Sf**0.5' type variables
+        #
+        other_new_quantities = ['alphax','alphay']
+        for newQ in other_new_quantities:
+            Quantity(self, name=newQ, register=True)
+
+        # Adjust the 'evolved_quantities' appropriately
+        self.evolved_quantities=self.conserved_quantities 
+        # Adjust the 'other quantities' appropriately
+        self.other_quantities = other_new_quantities+self.other_quantities
+
+        # Create some preliminary subgrid lookup tables
+        import subgrid_data as subgrid_data
+        self.subgrid_data = subgrid_data.SubgridData(self)
+
+        # Remove friction forcing [occurs in flux computation]
+        #self.forcing_terms.remove(manning_friction_implicit)
+        self.forcing_terms = []
+
+        #
+        if self.processor == 0 and self.verbose:
+            print '##########################################################################'
+            print '#'
+            print '# Using discontinuous elevation sub grid topography solver DE_SG'
+            print '#'
+            print '# First order timestepping'
             print '#'
             print '# Make sure you use centroid values when reporting on important output quantities'
             print '#'
@@ -992,7 +1089,7 @@ class Domain(Generic_Domain):
            tsunami
            DE
         """
-        compute_fluxes_methods = ['original', 'wb_1', 'wb_2', 'wb_3', 'tsunami', 'DE']
+        compute_fluxes_methods = ['original', 'wb_1', 'wb_2', 'wb_3', 'tsunami', 'DE', 'DE_SG']
 
         if flag in compute_fluxes_methods:
             self.compute_fluxes_method = flag
@@ -1042,7 +1139,7 @@ class Domain(Generic_Domain):
            original
            tsunami
         """
-        distribute_to_vertices_and_edges_methods = ['original',  'tsunami', 'DE']
+        distribute_to_vertices_and_edges_methods = ['original',  'tsunami', 'DE', 'DE_SG']
 
         if flag in distribute_to_vertices_and_edges_methods:
             self.distribute_to_vertices_and_edges_method = flag
@@ -1081,6 +1178,23 @@ class Domain(Generic_Domain):
 
         return self.using_discontinuous_elevation
 
+    def set_using_subgrid_algorithm(self, flag=False):
+        """Set flag to show whether compute flux algorithm
+        is allowing subgrid topography
+        
+        default is False
+        """
+
+        self.using_subgrid_algorithm = flag
+
+    def get_using_subgrid_algorithm(self):
+        """
+        Return boolean indicating whether algorithm is using subgrid topography
+        """
+
+        return self.using_subgrid_algorithm
+
+
     def set_flow_algorithm(self, flag='DE0'):
         """Set combination of slope limiting and time stepping
 
@@ -1093,6 +1207,7 @@ class Domain(Generic_Domain):
            DE0
            DE1
            DE2
+           DE_SG
            DE0_7
            DE1_7
         """
@@ -1104,7 +1219,7 @@ class Domain(Generic_Domain):
 
         flow_algorithms = ['1_0', '1_5', '1_75', '2_0', '2_0_limited', '2_5', \
                            'tsunami', 'yusuke', 'DE0', 'DE1', 'DE2', \
-                           'DE0_7', "DE1_7"]
+                           'DE0_7', "DE1_7", 'DE_SG']
 
         if flag in flow_algorithms:
             self.flow_algorithm = flag
@@ -1206,6 +1321,9 @@ class Domain(Generic_Domain):
         if self.flow_algorithm == 'DE2':
             self._set_DE2_defaults()
             
+        if self.flow_algorithm == 'DE_SG':
+            self._set_DE_SG_defaults()
+
         if self.flow_algorithm == 'DE0_7':
             self._set_DE0_7_defaults()
             
@@ -1852,6 +1970,19 @@ class Domain(Generic_Domain):
 
             self.flux_timestep = flux_timestep
 
+        elif self.compute_fluxes_method == 'DE_SG':
+            # Using Gareth Davies discontinuous elevation sub grid scheme
+            # Flux calculation and gravity incorporated in same
+            # procedure
+
+            from swSG1_domain_ext import compute_fluxes_ext_central \
+                                      as compute_fluxes_ext
+            timestep = self.evolve_max_timestep 
+
+            flux_timestep = compute_fluxes_ext(self, timestep)
+
+            self.flux_timestep = flux_timestep
+            
         else:
             raise Exception('unknown compute_fluxes_method')
 
@@ -1926,6 +2057,26 @@ class Domain(Generic_Domain):
             self.protect_against_infinitesimal_and_negative_heights()
             # Do extrapolation step
             from swDE1_domain_ext import extrapolate_second_order_edge_sw as extrapol2
+            extrapol2(self)
+        
+        elif self.compute_fluxes_method=='DE_SG':
+
+            # Do protection step
+            #self.protect_against_infinitesimal_and_negative_heights()
+
+            #assert(all(self.quantities['vol'].centroid_values==self.quantities['vol'].centroid_values))
+            #assert(all(self.quantities['u_vol'].centroid_values==self.quantities['u_vol'].centroid_values))
+            #assert(all(self.quantities['v_vol'].centroid_values==self.quantities['v_vol'].centroid_values))
+
+            # Update reference stage  / height / alpha_x / alpha_y from volume quantities
+            #assert num.all(self.quantities['vol'].centroid_values>=0.)
+            self.subgrid_data.set_quantities_from_subgrid_volume_quantities()
+            
+            # Do extrapolation step
+            #
+            # Stage  / height / alphax / alphay are extrapolated to edges
+            # [vertices for stage / height as well]
+            from swSG1_domain_ext import extrapolate_second_order_edge_sw as extrapol2
             extrapol2(self)
 
         else:
@@ -2144,35 +2295,74 @@ class Domain(Generic_Domain):
         #    Q.update(timestep)
         
         #print 'shallow water update conserved quantties'
-        
-        Elev = self.quantities['elevation']
-        Stage = self.quantities['stage']
-        Xmom = self.quantities['xmomentum']
-        Ymom = self.quantities['ymomentum']
 
-        Stage.update(timestep)
-        Xmom.update(timestep)   
-        Ymom.update(timestep) 
+        if(not self.get_using_subgrid_algorithm()):
         
-        if self.get_using_discontinuous_elevation():
-        
-            tff = self.tri_full_flag
+            Elev = self.quantities['elevation']
+            Stage = self.quantities['stage']
+            Xmom = self.quantities['xmomentum']
+            Ymom = self.quantities['ymomentum']
+
+            Stage.update(timestep)
+            Xmom.update(timestep)   
+            Ymom.update(timestep) 
+            
+            if self.get_using_discontinuous_elevation():
       
-            negative_ids = num.where( num.logical_and((Stage.centroid_values - Elev.centroid_values) < 0.0 , tff > 0) )[0]
+                tff = self.tri_full_flag
+
+                negative_ids = num.where( num.logical_and((Stage.centroid_values - Elev.centroid_values) < 0.0 , tff > 0) )[0]
             
-            if len(negative_ids)>0:
-                # FIXME: This only warns the first time -- maybe we should warn whenever loss occurs?
-                import warnings
-                msg = 'Negative cells being set to zero depth, possible loss of conservation. \n' +\
-                      'Consider using domain.report_water_volume_statistics() to check the extent of the problem'
-                warnings.warn(msg)
+                if len(negative_ids)>0:
+                    # FIXME: This only warns the first time -- maybe we should warn whenever loss occurs?
+                    import warnings
+                    msg = 'Negative cells being set to zero depth, possible loss of conservation. \n' +\
+                          'Consider using domain.report_water_volume_statistics() to check the extent of the problem'
+                    warnings.warn(msg)
 
-                Stage.centroid_values[negative_ids] = Elev.centroid_values[negative_ids]
-                Xmom.centroid_values[negative_ids] = 0.0
-                Ymom.centroid_values[negative_ids] = 0.0          
+                    Stage.centroid_values[negative_ids] = Elev.centroid_values[negative_ids]
+                    Xmom.centroid_values[negative_ids] = 0.0
+                    Ymom.centroid_values[negative_ids] = 0.0          
+        else:
+            # Check for NANs
+            #assert(all(self.quantities['vol'].explicit_update==self.quantities['vol'].explicit_update))
+            #assert(all(self.quantities['u_vol'].explicit_update==self.quantities['u_vol'].explicit_update))
+            #assert(all(self.quantities['v_vol'].explicit_update==self.quantities['v_vol'].explicit_update))
 
+            #assert(all(self.quantities['vol'].centroid_values>=0.))
+
+            self.quantities['vol'].update(timestep)
+          
+            #self.quantities['u_vol'].semi_implicit_update*=num.maximum(self.quantities['vol'].centroid_values, 0.)
+            #self.quantities['v_vol'].semi_implicit_update*=num.maximum(self.quantities['vol'].centroid_values, 0.)
+ 
+            self.quantities['u_vol'].update(timestep)
+            self.quantities['v_vol'].update(timestep)
+
+            #nearZer = (self.quantities['vol'].centroid_values<1.0e-10*self.areas).nonzero()[0]
+            #self.quantities['u_vol'].centroid_values[nearZer]=0.
+            #self.quantities['v_vol'].centroid_values[nearZer]=0.
+            #assert all(self.quantities['vol'].centroid_values>=0.)
             
+            if not (all(self.quantities['vol'].centroid_values>=1.0e-08*self.areas)):
+                negCells=(self.quantities['vol'].centroid_values<1.0e-08*self.areas).nonzero()[0]
+                #print 'Clipping'
+                #print 'Vol: ', self.quantities['vol'].centroid_values[negCells]
+                #print 'u-vol: ', self.quantities['u_vol'].centroid_values[negCells]
+                #print 'v-vol: ', self.quantities['v_vol'].centroid_values[negCells]
+                #self.quantities['vol'].centroid_values[negCells]=0.
+                self.quantities['u_vol'].centroid_values[negCells]=0.
+                self.quantities['v_vol'].centroid_values[negCells]=0.
+           
+ 
+            # Check for NAN
+            #assert(all(self.quantities['vol'].centroid_values==self.quantities['vol'].centroid_values))
+            #assert(all(self.quantities['u_vol'].centroid_values==self.quantities['u_vol'].centroid_values))
+            #assert(all(self.quantities['v_vol'].centroid_values==self.quantities['v_vol'].centroid_values))
+            
+            #self.subgrid_data.set_quantities_from_subgrid_volume_quantities()
 
+        return            
 
     def update_other_quantities(self):
         """ There may be a need to calculates some of the other quantities
@@ -2376,6 +2566,7 @@ class Domain(Generic_Domain):
             # Store model data, e.g. for subsequent visualisation
             if self.store is True:
                 self.store_timestep()
+
 
             if self.checkpoint:
                 
@@ -2814,6 +3005,48 @@ class Domain(Generic_Domain):
 
             barrier()
         return
+
+    #########################################################################################
+    def apply_fractional_steps(self):
+        """
+            Overload apply_fractional_steps from generic_domain, for the sub-grid-topography case
+        """
+
+        if self.get_using_subgrid_algorithm():
+            ## stage / xmom / ymom will store the changes in the integrated
+            ## quantities. 
+            old_stage = 1.0*self.quantities['stage'].centroid_values
+            old_xmom = 1.0*self.quantities['xmomentum'].centroid_values
+            old_ymom = 1.0*self.quantities['ymomentum'].centroid_values
+            old_bed = 1.0*self.quantities['elevation'].centroid_values
+            # Offset elevation temporarily to avoid apparently dry cells
+            # This is ok for 'pure-volume' operators like rainfall / inflows
+            self.quantities['elevation'].centroid_values = old_bed - 100.
+
+
+        # Apply operators to stage / xmom etc
+        for operator in self.fractional_step_operators:
+            operator()
+
+        if self.get_using_subgrid_algorithm():
+            # Fix up elevation (temporarily changed to avoid apparently dry cells)
+            self.quantities['elevation'].centroid_values = old_bed
+            # The stage increase has recorded the volume increase
+            # The xmom increase has recorded the u_vol increase
+            # The ymom increase has recorded the v_vol increase
+            self.quantities['vol'].explicit_update = (self.quantities['stage'].centroid_values-old_stage)*self.areas
+            self.quantities['vol'].semi_implicit_update*= 0.
+            self.quantities['u_vol'].explicit_update = (self.quantities['xmomentum'].centroid_values-old_xmom)*self.areas
+            self.quantities['u_vol'].semi_implicit_update*= 0.
+            self.quantities['v_vol'].explicit_update = (self.quantities['ymomentum'].centroid_values-old_ymom)*self.areas
+            self.quantities['v_vol'].semi_implicit_update*= 0.
+
+            self.quantities['vol'].update(1.0)
+            self.quantities['u_vol'].update(1.0)
+            self.quantities['v_vol'].update(1.0)
+            # Update the other quantities
+            #self.subgrid_data.set_quantities_from_subgrid_volume_quantities()
+
 
 ################################################################################
 # End of class Shallow Water Domain

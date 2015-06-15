@@ -30,6 +30,9 @@ def configuration(parent_package='',top_path=None):
                          sources=['swDE1_domain_ext.c'],
                          include_dirs=[util_dir])
 
+    config.add_extension('swSG1_domain_ext',
+                         sources=['swSG1_domain_ext.c'],
+                         include_dirs=[util_dir])
 
     return config
     
