@@ -16,6 +16,9 @@
 AnuGA
 =====
 
+This is an experimental fork of ANUGA -- for the main reposority please see
+https://github.com/GeoscienceAustralia/anuga_core
+
 .. contents::
 
 What is AnuGA?
