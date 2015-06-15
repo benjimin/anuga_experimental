@@ -26,11 +26,11 @@ chan_bankfull_depth = 1.0 # Bankfull depth of the channel
 chan_width = 10. # Bankfull width of the channel
 bankwidth = 2. # Width of the bank regions -- note that these protrude into the channel
 man_n = 0.03 # Manning's n
-l0 = 3.0 # Length scale associated with triangle side length in channel (min_triangle area = 0.5*l0^2)
+l0 = 5.0 # Length scale associated with triangle side length in channel (min_triangle area = 0.5*l0^2)
 Qin = 4.5
 flow_in_yval = 5.0
 flow_algorithm = 'DE_SG'
-reference_gradient_type = 'bed-slope'
+reference_gradient_type = 'zero' #'bed-slope'
 
 
 assert chan_width < floodplain_width, \

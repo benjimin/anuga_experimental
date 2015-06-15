@@ -38,7 +38,7 @@ l0 = 20. # Length scale associated with triangle side length in channel (min_tri
 initial_stage = 2.50
 
 flow_algorithm = 'DE_SG' # DE0 # DE1
-reference_gradient_type = 'bed-slope' # 'zero'
+reference_gradient_type = 'zero' #'bed-slope' # 'zero'
 
 assert chan_width < floodplain_width, \
         ' ERROR: Channel width is greater than floodplain width'
