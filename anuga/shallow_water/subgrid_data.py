@@ -714,8 +714,9 @@ def make_subgrid_table_for_one_cell(
                                    edge1_pts.tolist() +
                                    edge2_pts.tolist())
 
-    num_centroid_table_col = 10
-    upper_depth_offset = 5.  # FIXME: Ad-hoc
+    num_centroid_table_col = 20
+    #upper_depth_offset = 1000.0  # FIXME: Ad-hoc
+    upper_depth_offset = 0.75*max_reference_depth
 
     centroid_table = compute_subgrid_table(
         max_reference_depth,
@@ -730,9 +731,7 @@ def make_subgrid_table_for_one_cell(
 
     # EDGE TABLES HERE
 
-    num_edge_table_col = 10
-
-    # upper_depth_offset = 5. # FIXME: Ad-hoc
+    num_edge_table_col = 20
 
     edge_pts = [edge0_pts, edge1_pts, edge2_pts]
     edge_tables = [[], [], []]
@@ -821,8 +820,10 @@ def compute_subgrid_table(
     second_max_reference_depth = upper_depth_offset +\
         (subgrid_elevation - stage_at_refdepth0).max()
 
-    assert max_reference_depth > second_max_reference_depth,\
-        'max_reference_depth is <= the second max reference depth'
+    msg = 'max_reference_depth is <= the second max reference depth' + ' ' +\
+          str(max_reference_depth) + ' ' + str(second_max_reference_depth)
+    assert max_reference_depth > second_max_reference_depth, msg
+        
 
     table_depths = make_exponentially_spaced_sequence(
         min_reference_depth, second_max_reference_depth,

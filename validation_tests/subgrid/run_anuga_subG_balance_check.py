@@ -133,7 +133,7 @@ if __name__ == '__main__':
             topography,
             frictionFun,
             approx_grid_spacing = [1.0, 1.0],
-            max_reference_depth = 100.0,
+            max_reference_depth = 20.0,
             constant_subgrid_values = False,
             reference_gradient_type = reference_gradient_type)
 

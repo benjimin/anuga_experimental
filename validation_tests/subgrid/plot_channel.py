@@ -13,6 +13,8 @@ Qin = run_anuga_subG_channel.Qin
 floodplain_length = run_anuga_subG_channel.floodplain_length
 floodplain_width = run_anuga_subG_channel.floodplain_width
 
+channel_width = run_anuga_subG_channel.chan_width
+
 slp = run_anuga_subG_channel.floodplain_slope 
 man_n = run_anuga_subG_channel.man_n 
 
@@ -56,10 +58,14 @@ print 'stage_analytical ',stage_analytical
 
 p = util.get_centroids('channel.sww')
 
+# Get central channel indices
+keep = (abs(p.x - floodplain_width/2.0) < 0.5*(channel_width/2.0)).nonzero()
+#keep = range(len(p.x))
+
 pyplot.ion()
 
-pyplot.scatter(p.y, p.elev, color='brown')
-pyplot.scatter(p.y, p.stage[p.stage.shape[0]-1,:], color='red')
+pyplot.scatter(p.y[keep], p.elev[keep], color='brown')
+pyplot.scatter(p.y[keep], p.stage[p.stage.shape[0]-1,keep], color='red')
 pyplot.plot([y_loc, y_loc], [p.elev.min(), p.elev.max()], '-')
 pyplot.plot([0.0, floodplain_length], [stage_analytical, stage_analytical], '-')
 
