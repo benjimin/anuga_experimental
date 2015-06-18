@@ -12,9 +12,8 @@ AnuGA_ is a python package with some C extensions (and an optional fortran
 extension). At present AnuGA has only been run and tested using python 2.x.
 We recommend python 2.7.  
 
-If you have a python 2.7 environment with gcc and gfortran support, 
-then you can use pip to install the latest release 
-version of AnuGA::
+If you have a python 2.7 environment with gcc and gfortran support, then 
+you can use pip to install the latest release version of AnuGA::
 
 	pip install anuga
 
