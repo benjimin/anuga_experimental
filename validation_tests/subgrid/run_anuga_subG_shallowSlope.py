@@ -122,6 +122,7 @@ if __name__ == '__main__':
     domain.set_name('shallow_slope') # Output name
     domain.set_store_vertices_uniquely(True)
 
+    domain.quantities_to_be_stored['elevation'] = 2
 
     #from anuga.utilities import subGridUtil as sgu
     #mean_topography=sgu.make_spatially_averaged_Fun(

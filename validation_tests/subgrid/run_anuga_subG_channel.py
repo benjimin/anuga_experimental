@@ -14,6 +14,7 @@ import anuga
 import numpy
 from anuga.structures.inlet_operator import Inlet_operator
 from anuga import create_domain_from_regions
+
 #------------------------------------------------------------------------------
 # Useful parameters for controlling this case
 #------------------------------------------------------------------------------
