@@ -12,6 +12,7 @@ class NullStream:
 
 
 try:
+    raise #BL -- FIXME -- temporary modification to rule out pypar
     import sys
     sys.stdout = NullStream()
     import pypar

@@ -33,7 +33,7 @@ from anuga import __version__
 exclude_files = []
 
 # Directories that should not be searched for test files.
-exclude_dirs = ['shallow_water_balanced' ,
+exclude_dirs = [#'shallow_water_balanced' ,
                 '.svn',          # subversion
                 'props', 'wcprops', 'prop-base', 'text-base', 'tmp']
 

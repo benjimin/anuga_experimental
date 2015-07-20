@@ -31,9 +31,12 @@ man_n=0.03 # Manning's n
 l0 = 15 # Length scale associated with triangle side length in channel (min_triangle area = 0.5*l0^2)
 #l0 = 4
 
+filename='drainage-flat'
+
 flow_in_yval = 5.0 # y-value of line along which the input discharge is passed
 #Qin = 0.5 # Input discharge
-stage_rel_to_plain = -0.1 # Target steady state analytic water depth
+
+stage_rel_to_plain = 0.3 # Target steady state analytic water depth
 
 flow_algorithm = 'DE_SG'
 reference_gradient_type = 'bed-slope'
@@ -41,16 +44,16 @@ reference_gradient_type = 'bed-slope'
 drain_count = 3
 drains_proportion_of_width = 0.25
 drains_proportion_of_length = 0.8
-drain_depth = -1.
+drain_depth = -0.000001
 
 """
 We know Q = sqrt(abs(slope))/n_manning * integral of depth^(5/3) across transverse axis
 And since the integrand is piecewise constant...
 """
 assert stage_rel_to_plain > drain_depth
-Qin = abs(floodplain_slope)^(0.5)/man_n * (
-        drains_proportion_of_width * (stage_rel_to_plain - drain_depth)**(5.0/3.0)
-	+ (1-drains_proportion_of_width) * (0 if stage_rel_to_plain<0 else stage_rel_to_plain)**(5.0/3.0) )
+drain_portion = drains_proportion_of_width * (stage_rel_to_plain - drain_depth)**(5.0/3.0)
+plain_portion = (1.0-drains_proportion_of_width) * max(0.0,stage_rel_to_plain)**(5.0/3.0)
+Qin = abs(floodplain_slope)**(0.5)/man_n * (drain_portion + plain_portion)
 assert Qin > 0
 
 assert int(drain_count)>=1
@@ -153,7 +156,7 @@ if __name__ == '__main__':
     #domain.set_flow_algorithm('DE0')
     #domain.set_flow_algorithm('DE1')
 
-    domain.set_name('drainage') # Output name
+    domain.set_name(filename) # Output name
     domain.set_store_vertices_uniquely(True)
 
     domain.quantities_to_be_stored['elevation'] = 2
