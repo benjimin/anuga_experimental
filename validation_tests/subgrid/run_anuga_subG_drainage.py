@@ -53,7 +53,7 @@ And since the integrand is piecewise constant...
 assert stage_rel_to_plain > drain_depth
 drain_portion = drains_proportion_of_width * (stage_rel_to_plain - drain_depth)**(5.0/3.0)
 plain_portion = (1.0-drains_proportion_of_width) * max(0.0,stage_rel_to_plain)**(5.0/3.0)
-Qin = abs(floodplain_slope)**(0.5)/man_n * (drain_portion + plain_portion)
+Qin = abs(floodplain_slope)**(0.5)/man_n * floodplain_width*(drain_portion + plain_portion)
 assert Qin > 0
 
 assert int(drain_count)>=1
