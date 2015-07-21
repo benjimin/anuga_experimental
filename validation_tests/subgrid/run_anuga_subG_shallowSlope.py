@@ -30,7 +30,7 @@ bankwidth = 2. # Width of the bank regions -- note that these protrude into the 
 man_n=0.03 # Manning's n
 l0 = 15 # Length scale associated with triangle side length in channel (min_triangle area = 0.5*l0^2)
 
-flow_in_yval = 5.0 # y-value of line along which the input discharge is passed
+flow_in_yval = 0.0 # y-value of line along which the input discharge is passed
 Qin = 0.5 # Input discharge
 
 flow_algorithm = 'DE_SG'
