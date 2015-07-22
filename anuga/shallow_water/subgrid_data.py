@@ -798,7 +798,7 @@ def compute_subgrid_table(
         @param num_table_col = how many columns in the subgrid table
         @param stage_at_refdepth0 = vector of values for x,y describing
             the subgrid topography and assumed water surface elevation, with 
-            stage(x,y) = reference_depth(x,y) + stage_at_refdepth0(x,y)
+            stage(x,y) = reference_depth + stage_at_refdepth0(x,y)
         @param subgrid_elevation = vector of subgrid elevation values
         @param subgrid_friction = vector of subgrid friction values
         @param length_or_area = edge_length if feature_type = 'edge', or
@@ -815,10 +815,11 @@ def compute_subgrid_table(
         raise Exception('feature_type must be "edge" or "volume"')
 
     min_reference_depth = (subgrid_elevation - stage_at_refdepth0).min()
-    min_interior_reference_depth = min_reference_depth
+    #min_interior_reference_depth = min_reference_depth
 
-    second_max_reference_depth = upper_depth_offset +\
-        (subgrid_elevation - stage_at_refdepth0).max()
+    #second_max_reference_depth = upper_depth_offset +\
+    #    (subgrid_elevation - stage_at_refdepth0).max()
+    second_max_reference_depth = upper_depth_offset
 
     msg = 'max_reference_depth is <= the second max reference depth' + ' ' +\
           str(max_reference_depth) + ' ' + str(second_max_reference_depth)

@@ -84,7 +84,7 @@ inline double eval_subgrid_function(double value, int k, int edge,
     //        quantities) for interpolation function
     //
     // var = code for the interpolation function to look up 
-    //       0 - wetted area or length, over volume or edge respectively
+    //       0 - wetted area (over cell volume, edge = -1) or length (over cell edge, edge = 0,1,2)
     //       1 - integral (h), over volume or edge
     //       2 - integral 1/n h^(5/3), over volume or edge
     //       3 - integral 1/n^2 h^(7/3), over edge [not supported for volume]
@@ -149,7 +149,7 @@ inline double eval_subgrid_function(double value, int k, int edge,
                                              1.0, // volume curve grows as ~ h^1
                                              3./5., // int 1/n h^(5/3) curve grows as ~ h^(5/3)
                                              3./7., // int 1/n^2 h^(7/3) curve grows as ~ h^(7/3)
-                                             1./2.};// int h^2 curve grows as ~ h^(2)
+                                             1./2. }; // int h^2 curve grows as ~ h^(2)
 
 
     //////////////////////////////////////////////////////////////////////////////
@@ -158,32 +158,32 @@ inline double eval_subgrid_function(double value, int k, int edge,
     //
     /////////////////////////////////////////////////////////////////////////////
     
-    // // Check that var has a valid value 
-    // if(var < 0 | var >= 5){
-    //     report_python_error(AT, "Invalid lookup var code: Must be in 0,1,2,3,4");
-    //     return -1.0;
-    // }
+    // Check that var has a valid value 
+    if(var < 0 | var >= 5){
+        report_python_error(AT, "Invalid lookup var code: Must be in 0,1,2,3,4");
+        return -1.0;
+    }
 
-    // // Check that if we are interpolating from a volume curve, then var <= 2
-    // // (Since we only store area/volume/integral(1/n h^(5/3)))
-    // if ( edge == -1){
-    //     if ( var > 2 ){
-    //         report_python_error(AT, "Invalid lookup var code for centroid: Must be 0 or 1 or 2");
-    //         return -1.0;
-    //     }
-    // }else{
-    //     if ( edge > 2 | edge < -1){
-    //         report_python_error(AT, "Invalid edge code: Must be -1 (for the volume) or 0 or 1 or 2 (for corresponding edges)");
-    //         return -1.0;
-    //     }
-    // }
+    // Check that if we are interpolating from a volume curve, then var <= 2
+    // (Since we only store area/volume/integral(1/n h^(5/3)))
+    if ( edge == -1){
+        if ( var > 2 ){
+            report_python_error(AT, "Invalid lookup var code for centroid: Must be 0 or 1 or 2");
+            return sqrt(-1.0);
+        }
+    }else{
+        if ( edge > 2 | edge < -1){
+            report_python_error(AT, "Invalid edge code: Must be -1 (for the volume) or 0 or 1 or 2 (for corresponding edges)");
+            return sqrt(-1.0);
+        }
+    }
 
-    // // Check that value is not NAN
-    // if(value != value){
-    //     printf("var : %d, inverse: %d \n", var, inverse);
-    //     report_python_error(AT, "NAN lookup value");
-    //     return -1.0;
-    // }
+    // Check that value is not NAN
+    if(value != value){
+        printf("var : %d, inverse: %d \n", var, inverse);
+        report_python_error(AT, "NAN lookup value");
+        return sqrt(-1.0);
+    }
 
     //////////////////////////////////////////////////////////////////////////////////
     //
@@ -205,7 +205,7 @@ inline double eval_subgrid_function(double value, int k, int edge,
             subtable_ncol = D->subgrid_centroid_i_ncol[k] ;
             subtable_lastcol = D->subgrid_centroid_last_lookup_col[k] ;
         }else{
-            ki = 3*k+edge; // Linear index for edge 
+            ki = 3*k + edge; // Linear index for edge 
             //lookup_table = D->subgrid_edge_table ;
             //starting_index = D->subgrid_edge_starting_index[ki] ;
 
@@ -288,17 +288,19 @@ inline double eval_subgrid_function(double value, int k, int edge,
                             printf("NaN error\n");
                         }
                         report_python_error(AT, "Interpolation search error");
-                        return -1.0;
+                        return sqrt(-1.0);
                     }
 
                     // Ensure we have not exceeded the upper bound of our table
                     if(value_ind >= ub){
-                         printf("%d, %d, %d, %d \n", value_ind, lb, ub, var);
-                         printf("... %e, %e, %e \n", value, 
-                                lookup_table[lb],lookup_table[ub]);
+                         printf("value_ind: %d, lb: %d, ub: %d, var: %d, inv: %d, edge: %d \n", 
+                                value_ind, lb, ub, var, inverse, edge);
+                         printf("... value = %e, lower_t = %e, upper_t = %e, x = %e, y = %e \n", value, 
+                                lookup_table[lb],lookup_table[ub],
+                                D->centroid_coordinates[2*k], D->centroid_coordinates[2*k+1]);
                          report_python_error(AT, 
                              "Interpolation searched outside range of table values");
-                         return -1.0;
+                         return sqrt(-1.0);
                     }
                 }
             }
@@ -454,10 +456,10 @@ inline double eval_subgrid_function(double value, int k, int edge,
     w1 = (t3 - t1);
 
     // // Only positive weights are reasonable
-    if(w0<0.0 | w1 < 0.0){
+    if(w0 < 0.0 | w1 < 0.0){
         printf("%e, %e, %e, %e,%e,%e \n", t1, t2, t3, w0, w1, base_value);
         report_python_error(AT,"Interpolation Error, negative weights");
-        return -1.0;
+        return sqrt(-1.0);
 
     }
 
@@ -479,7 +481,7 @@ inline double eval_subgrid_function(double value, int k, int edge,
                 lookup_table[value_ind], lookup_table[value_ind+1], 
                 w0, w1, base_value);
         report_python_error(AT, "Interpolated value is NAN");
-        return -1.0;
+        return sqrt(-1.0);
     }
 
     return return_value;
@@ -1119,7 +1121,7 @@ inline int _get_rotated_subgrid_edge_quantities(
         // 1/n h^(5/3) integral
         var = 2;
         //h_5on3n_integral = eval_subgrid_function(stage_left, ck, ei, var, inverse, D);
-        use_last_lookup_info = 1; // Can reuse the lookup indices
+        //use_last_lookup_info = 1; // Can reuse the lookup indices
         h_5on3n_integral = eval_subgrid_function(stage_left, ck, ei, var, inverse, 
                                                 D, use_last_lookup_info, use_last_cube_root); //, lookup_table);
         // uh integral
@@ -1131,10 +1133,10 @@ inline int _get_rotated_subgrid_edge_quantities(
         // Terms u2h, v2h, uvh
         var = 3;
         //h_7on3n2_integral = eval_subgrid_function(stage_left, ck, ei, var, inverse, D);
-        use_last_cube_root = 1; // reuse cube-roots in interpolation weights
+        //use_last_cube_root = 1; // reuse cube-roots in interpolation weights
         h_7on3n2_integral = eval_subgrid_function(stage_left, ck, ei, var, inverse, D, 
                                                 use_last_lookup_info, use_last_cube_root) ; //, lookup_table);
-        use_last_cube_root = 0; // set back for safety
+        //use_last_cube_root = 0; // set back for safety
 
         // u^2h integral
         ql[3]=h_7on3n2_integral*u_scale*u_scale;
@@ -1198,7 +1200,7 @@ inline double _compute_fluxes_central(struct domain *D, double timestep){
     double max_speed_local, length, inv_area, zl, zr;
     double h_left, h_right, z_half ;  // For andusse scheme
     // FIXME: limiting_threshold is not used for DE
-    double limiting_threshold = 10*D->H0;
+    double limiting_threshold = 10 * D->H0;
     //
     int k, i, m, n,j, ii;
     int ki,k3, nm = 0, ki2,ki3, nm3, ck, ei,eki; // Index shorthands
@@ -1378,10 +1380,12 @@ inline double _compute_fluxes_central(struct domain *D, double timestep){
             //
             max_stage = max(sle, sre);
             //lookup_table = &(D->subgrid_edge_table[D->subgrid_edge_starting_index[ki]]) ;
-            cross_section_area_l = eval_subgrid_function( max_stage - zl + zc, k, i, 1, 0, D, 0, 0);
+            var = 1 ; // lookup cross-sectional area = integral [ height ]
+            inverse = 0; // not inverse lookup table
+            cross_section_area_l = eval_subgrid_function( max_stage - zl + zc, k, i, var, inverse, D, 0, 0);
             if(n >= 0){
                 //lookup_table = &(D->subgrid_edge_table[D->subgrid_edge_starting_index[nm]]) ;
-                cross_section_area_r = eval_subgrid_function( max_stage - zr + zc_n, n, m, 1, 0, D, 0, 0) ;
+                cross_section_area_r = eval_subgrid_function( max_stage - zr + zc_n, n, m, var, inverse, D, 0, 0) ;
             }else{
                 // Ensure left side will be used (cross_section_area_l < cross_section_area_r)
                 cross_section_area_r = cross_section_area_l + 99999.0;
@@ -1774,19 +1778,19 @@ inline double _compute_fluxes_central(struct domain *D, double timestep){
         } // end edge i
 
         // FRICTION -- only once per cell
-        alpha_norm = sqrt(pow(D->alphax_centroid_values[k],2)+pow(D->alphay_centroid_values[k],2));
+        alpha_norm = sqrt(pow(D->alphax_centroid_values[k], 2) + pow(D->alphay_centroid_values[k], 2)) ;
         sfx = D->alphax_centroid_values[k]*alpha_norm ;
-        sfy = D->alphay_centroid_values[k]*alpha_norm ; 
+        sfy = D->alphay_centroid_values[k]*alpha_norm ;
         //D->u_vol_explicit_update[k] -= D->g * D->vol_centroid_values[k]*sfx ;
         //D->v_vol_explicit_update[k] -= D->g * D->vol_centroid_values[k]*sfy ;
-        D->u_vol_semi_implicit_update[k] -= D->g * D->vol_centroid_values[k]*sfx; 
-        D->v_vol_semi_implicit_update[k] -= D->g * D->vol_centroid_values[k]*sfy; 
+        D->u_vol_semi_implicit_update[k] -= D->g * D->vol_centroid_values[k]*sfx ;
+        D->v_vol_semi_implicit_update[k] -= D->g * D->vol_centroid_values[k]*sfy ;
 
     }  // end cell k
 
     // Ensure we only update the timestep on the first call within each rk2/rk3 step
     if(substep_count==0){
-        timestep=local_timestep; 
+        timestep = local_timestep; 
         //D->timestep = timestep;
     } 
     return timestep;
@@ -2985,7 +2989,7 @@ PyObject *set_subgrid_volume_quantities_from_reference_quantities(PyObject *self
                                                   use_last_cube_root); //, lookup_table);
  
       // From here we can avoid recomputing lookup locations 
-      use_last_lookup_info = 1;
+      //use_last_lookup_info = 1;
 
       var = 1 ; // Get volume
       D.vol_centroid_values[k] = eval_subgrid_function( D.stage_centroid_values[k],
@@ -3075,7 +3079,7 @@ PyObject *set_quantities_from_subgrid_volume_quantities(PyObject *self, PyObject
           // u_vol = (1/n h^(5/3)_integral_function)*(alpha_x)
           var = 2; 
           inverse = 0; // This prevents us from reusing lookup info immediately
-          use_last_lookup_info = 1; //From here we can avoid recomputing lookup index details
+          //use_last_lookup_info = 1; //From here we can avoid recomputing lookup index details
           uh = eval_subgrid_function(D.stage_centroid_values[k],
                                      k, edge, var, inverse, &D, 
                                      use_last_lookup_info, 
@@ -3100,7 +3104,7 @@ PyObject *set_quantities_from_subgrid_volume_quantities(PyObject *self, PyObject
 
       // COSMETIC ONLY
       // Set xmom / ymom 
-      if(D.subgrid_wet_area[k]>0.){
+      if(D.subgrid_wet_area[k] > 0.){
         area_inv = 1./D.subgrid_wet_area[k];
         D.xmom_centroid_values[k] = D.u_vol_centroid_values[k]*area_inv;
         D.ymom_centroid_values[k] = D.v_vol_centroid_values[k]*area_inv;
