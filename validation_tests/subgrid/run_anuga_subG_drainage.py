@@ -20,6 +20,10 @@ from anuga import create_domain_from_regions
 # Useful parameters for controlling this case
 #------------------------------------------------------------------------------
 
+stage_rel_to_plain = -0.05 # Target steady state analytic water depth
+drain_depth = -1
+filename='drainage'
+
 floodplain_length = 1000.0 # Model domain length
 floodplain_width = 100.0 # Model domain width
 floodplain_slope = 1./10.
@@ -29,29 +33,25 @@ chan_width = 5. # Bankfull width of the channel
 bankwidth = 2. # Width of the bank regions -- note that these protrude into the channel
 man_n=0.03 # Manning's n
 l0 = 15 # Length scale associated with triangle side length in channel (min_triangle area = 0.5*l0^2)
-#l0 = 4
-
-filename='drainage-flat'
+l0 = 2
 
 flow_in_yval = 5.0 # y-value of line along which the input discharge is passed
 #Qin = 0.5 # Input discharge
 
-stage_rel_to_plain = 0.3 # Target steady state analytic water depth
-
-flow_algorithm = 'DE_SG'
+flow_algorithm = 'DE1'
 reference_gradient_type = 'bed-slope'
 
 drain_count = 3
 drains_proportion_of_width = 0.25
 drains_proportion_of_length = 0.8
-drain_depth = -0.000001
+
 
 """
 We know Q = sqrt(abs(slope))/n_manning * integral of depth^(5/3) across transverse axis
 And since the integrand is piecewise constant...
 """
-assert stage_rel_to_plain > drain_depth
-drain_portion = drains_proportion_of_width * (stage_rel_to_plain - drain_depth)**(5.0/3.0)
+#assert stage_rel_to_plain > drain_depth
+drain_portion = drains_proportion_of_width * max(0.0,stage_rel_to_plain-drain_depth)**(5.0/3.0)
 plain_portion = (1.0-drains_proportion_of_width) * max(0.0,stage_rel_to_plain)**(5.0/3.0)
 Qin = abs(floodplain_slope)**(0.5)/man_n * floodplain_width*(drain_portion + plain_portion)
 assert Qin > 0
