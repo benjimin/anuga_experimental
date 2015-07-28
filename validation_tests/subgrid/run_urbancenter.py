@@ -20,8 +20,11 @@ breaklines = None # whether or not to place break lines around buildings
 
 building_height = 2.5 # metres (should exceed 1.15m)
 
+cliff_fall = -10 # metres (substitute for over-fall boundary)
+bucket_width = 50 # m (extends right edge of domain)
+
 display_figure = True # whether to show a diagram of the scenario
-display_points = 15000
+display_points = 50000
 
 
 
@@ -30,7 +33,7 @@ display_points = 15000
 # scenario constants:  (refer to pg.30-31 of citation, do not change)
 
 floodplain_size = [1500,500] # metres
-floodplain_slope = [-0.0001,0] # constant slope is entirely in longitudinal direction
+floodplain_slope = [-0.001,0] # constant slope gradient is entirely in longitudinal direction
 manning_coefficient = 0.035 # m^(-1/3) s
 building_array = (5,5) # number of buildings in each direction
 building_size = [10,20] # m
@@ -87,88 +90,50 @@ town = Path.make_compound_path(*buildings)
 placement = Affine2D().rotate_deg(building_array_angle).translate(*building_centroid)
 town = town.transformed(placement)
   
-def elevation(x,y): # test: does this break if x,y are NOT vectors?  
+def elevation(x,y): 
   points = np.vstack((x,y)).T # convert pair-of-lists (input) to list-of-pairs
   
   indoor_boolean = town.contains_points(points)
   urban_thickness = np.where(indoor_boolean, building_height, 0)
-  
+    
   hillside = np.dot(points, floodplain_slope)
   
-  return hillside + urban_thickness
-  # convert boolean to elevations
+  cliff = np.where(x > floodplain_size[0], cliff_fall, 0) # fall past right side of plain
+  
+  return hillside + urban_thickness + cliff
+  
+
+"""
+
+Breaklines:
+
+Sanders, et al, used a free-overfall boundary-condition at the downstream (right) boundary. 
+For the purposes of testing solver algorithms in which not all boundary types have been
+implemented yet (e.g. using only reflective boundary walls), we can simulate free-overfall 
+by implementing a cliff edge (and downstream bucket). We can improve this simulation by
+aligning the mesh with the cliff edge, i.e., by using anuga's riverwall or breakline feature.
+
+Moreover, we may wish to align mesh to building edges, at least for comparison.
+
+"""
 
 
+
+
+
+"""
+
+Can compare plot with fig. 8 of Sanders et al. to check elevation looks sensible
+
+"""
 if display_figure:
   import matplotlib.pyplot as plt 
   sx,sy = floodplain_size
+  sx += bucket_width
   x = np.random.rand(display_points)*sx
   y = np.random.rand(display_points)*sy
   plt.figure().add_subplot(111,aspect='equal')
-  plt.scatter(x,y,c=elevation(x,y),alpha=0.5,cmap='Paired',linewidth=0)
+  plt.scatter(x,y,c=elevation(x,y),alpha=0.5,cmap='Paired',linewidth=0, marker='.')
   plt.colorbar()
   plt.show()
 
-
-"""
-import matplotlib.pyplot as plt
-import matplotlib.patches as patches
-
-fig=plt.figure()
-ax = fig.add_subplot(111)
-patch=patches.PathPatch(building,facecolor='orange',lw=2)
-ax.add_patch(patch)
-ax.set_xlim(-2,2)
-ax.set_ylim(-2,2)
-plt.show()
-
-
-
-
-
-
-def building(x,y):
-    from numpy import piecewise as pw
-    return 
-
-# building -- a step function
-# array -- sum (with translation)
-# rotate -- this is just a linear change of variables.
-# slope -- simplest to just add with building elevation
-
-# test that building works:
-assert building(0.9*building_size[0]/2.0,0.9*building_size[1]/2.0)==building_height, "Building interiors failed"
-assert building(1.1*building_size[0]/2.0,1.1*building_size[1]/2.0)==0, "Building exteriors failed"
-
-
-import unittest
-class Tests(unittest.TestCase):
-  def test_building(self):
-    self.assertEqual(building(
-    
-    
-    
-x = np.array([32,0.5,-1])
-y = np.array([12,0.5,-1])
-z = np.vstack((x,y)).T
-
-print elevation(x,y) + 1
-    
-def elevation(x,y):
-  points = np.vstack((x,y)).T # convert pair-of-lists to list-of-pairs
-  
-  dx,dy = np.asarray(building_size)*0.5
-  polygon_vertices = [(-dx,dy),(dx,dy),(dx,-dy),(-dx,-dy)]
-  #polygon_codes = [path.Path.MOVETO] + [path.Path.LINETO]*3 + [path.Path.CLOSEPOLY]
-  building = path.Path(polygon_vertices)#,codes=polygon_codes)
-  
-  #print polygon_vertices
-  #print x
-  
-  #print points
-  
-  indoor = building.contains_points(points) # obtain boolean
-  #indoor = building.contains_points(np.array([[32. ,  12. ], [  0.5  , 0.5], [ -1.  , -1. ]])) # obtain boolean
-  return np.where(indoor,building_height,0.0) # convert boolean to elevations    
-    
-"""
