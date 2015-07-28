@@ -10,7 +10,14 @@ with anisotropic porosity for urban flood modeling, J.Hydrol. (2008) 362, 19-38.
 
 """
 
-# configurable parameters
+# testing options:
+
+display_figure = True # whether to show a diagram of the scenario
+
+
+
+
+# configurable parameters: (not yet implemented)
 
 method = 'DE1' # method could be DE1 or subgrid.
 
@@ -18,14 +25,16 @@ mesh_size = None
 
 breaklines = None # whether or not to place break lines around buildings
 
+
+
+
+
+# extra scenario constants:
+
 building_height = 2.5 # metres (should exceed 1.15m)
 
 cliff_fall = -10 # metres (substitute for over-fall boundary)
 bucket_width = 50 # m (extends right edge of domain)
-
-display_figure = True # whether to show a diagram of the scenario
-display_points = 50000
-
 
 
 
@@ -42,6 +51,7 @@ building_centroid = [750,250] #m
 building_array_angle = 45 # degrees (anti-clockwise)
 discharge = 400 # cubic metres per second at upstream (left) boundary
 simulation_time = 4000 # seconds (i.e. to approximately reach steady state)
+
 
 
 """
