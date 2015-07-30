@@ -109,6 +109,10 @@ if myid == 0:
             interior_regions=interior_regions,
             use_cache=use_cache,
             verbose=verbose)
+	    
+	    
+    print mesh
+    exit()    
 
     domain = anuga.create_domain_from_file(meshname)
     

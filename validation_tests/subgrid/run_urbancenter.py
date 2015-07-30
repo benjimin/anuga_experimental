@@ -13,7 +13,7 @@ with anisotropic porosity for urban flood modeling, J.Hydrol. (2008) 362, 19-38.
 # testing options:
 
 display_figure = True # whether to show a diagram of the scenario
-
+display_points = 50000 # 
 
 
 
@@ -21,9 +21,9 @@ display_figure = True # whether to show a diagram of the scenario
 
 method = 'DE1' # method could be DE1 or subgrid.
 
-mesh_size = None
+mesh_resolution = 0.5*(100)**2 # m^2, minimum triangle area
 
-breaklines = None # whether or not to place break lines around buildings
+breaklines_around_buildings = True # Boolean, whether the mesh should conform to the urban plan
 
 
 
@@ -65,7 +65,8 @@ directly onto a grid rather than workding with coordinates of the
 unstructured mesh.
 
 Note: older Matplotlib versions (before 1.3) had a bug in "contains_points"
-which could be worked-around using "contains_point" instead.
+which could be worked-around using "contains_point" or by breaking compound
+paths into polygons defined without explicit closure.
 
 """
 
@@ -96,7 +97,7 @@ translations = (Affine2D().translate(tx,ty) for tx,ty in locations)
 buildings = [building.transformed(new_position) for new_position in translations]
 town = Path.make_compound_path(*buildings)
   
-# rotate anticlockwise then (chaining) translate urban centroid.
+# rotate anticlockwise then (chaining) shift urban centroid into position.
 placement = Affine2D().rotate_deg(building_array_angle).translate(*building_centroid)
 town = town.transformed(placement)
   
@@ -127,6 +128,44 @@ Moreover, we may wish to align mesh to building edges, at least for comparison.
 
 """
 
+# create cliff-edge polyline
+cx,cy = floodplain_size
+cliff = [(cx,0),(cx,cy)]
+
+breaklines = [cliff]
+
+if breaklines_around_buildings:
+  breaklines += town.to_polygons() # Note all already explicitly closed
+  
+
+"""
+
+Mesh generation.
+
+"""
+
+# implicitly-closed polygon which encloses the floodplain (plus the basin below the cliff)
+cx += bucket_width
+extent = [(0,0),(0,cy),(cx,cy),(cx,0)]
+
+
+import anuga
+
+# ought to treat bucket as different interior region
+
+meshname = 'urban.msh' # if None then anuga won't generate_mesh
+
+mesh = anuga.create_mesh_from_regions(extent,boundary_tags={'outside':[0,1,2,3]},
+  maximum_triangle_area=mesh_resolution, breaklines=breaklines, filename=meshname)
+  
+
+"""
+
+Domain creation
+
+"""
+
+
 
 
 
@@ -137,13 +176,27 @@ Can compare plot with fig. 8 of Sanders et al. to check elevation looks sensible
 
 """
 if display_figure:
-  import matplotlib.pyplot as plt 
+  import matplotlib.pyplot as plt
+  from matplotlib.patches import PathPatch
+  
+  # randomly test elevation function
   sx,sy = floodplain_size
   sx += bucket_width
   x = np.random.rand(display_points)*sx
   y = np.random.rand(display_points)*sy
-  plt.figure().add_subplot(111,aspect='equal')
+  ax = plt.figure().add_subplot(111,aspect='equal') # set aspect ratio
   plt.scatter(x,y,c=elevation(x,y),alpha=0.5,cmap='Paired',linewidth=0, marker='.')
-  plt.colorbar()
+  plt.colorbar() # elevation is mapped to colour
+  
+  # check the mesh looks ok
+  pts = mesh.getMeshVertices()
+  paths = (Path([pts[i],pts[j],pts[k],pts[i]]) for i,j,k in mesh.getTriangulation())
+  ax.add_patch(PathPatch(Path.make_compound_path(*paths),fill=None,alpha=0.2))
+  
+  # check the buildings (and cliff) align with expectations
+  shapes = Path.make_compound_path(town,Path(cliff)) # town + cliff
+  ax.add_patch(PathPatch(shapes,fill=None,linewidth=0.5,color='black',alpha=0.8,linestyle='dashed'))
+  
   plt.show()
+  
 
