@@ -1,6 +1,6 @@
 """
 
-This scenario is a floodplain containing an array of buildings to induce anisotropic flow.
+This scenario is a floodplain containing an array of buildings to induce anisotropy in the flow.
 
 This test is based from (and aims to replicate):
 
@@ -13,7 +13,7 @@ with anisotropic porosity for urban flood modeling, J.Hydrol. (2008) 362, 19-38.
 # testing options:
 
 display_figure = True # whether to show a diagram of the scenario
-display_points = 50000 # 
+display_points = 50000 # number of elevation samples
 
 
 
@@ -21,10 +21,9 @@ display_points = 50000 #
 
 method = 'DE1' # method could be DE1 or subgrid.
 
-mesh_resolution = 0.5*(100)**2 # m^2, minimum triangle area
+mesh_resolution = 0.5*(100)**2   # m^2, minimum triangle area
 
 breaklines_around_buildings = True # Boolean, whether the mesh should conform to the urban plan
-
 
 
 
@@ -33,9 +32,8 @@ breaklines_around_buildings = True # Boolean, whether the mesh should conform to
 
 building_height = 2.5 # metres (should exceed 1.15m)
 
-cliff_fall = -10 # metres (substitute for over-fall boundary)
+cliff_fall = -10 # metres (substitute for over-fall boundary-condition)
 bucket_width = 50 # m (extends right edge of domain)
-
 
 
 
@@ -144,37 +142,80 @@ Mesh generation.
 
 """
 
-# implicitly-closed polygon which encloses the floodplain (plus the basin below the cliff)
-cx += bucket_width
-extent = [(0,0),(0,cy),(cx,cy),(cx,0)]
-
-
 import anuga
 
-# ought to treat bucket as different interior region
+# implicitly-closed polygon enclosing the floodplain plus the basin below the cliff
+floodplain =  [(0,0),(0,cy),(cx,cy),(cx,0)]
+cx += bucket_width
+full_extent = [(0,0),(0,cy),(cx,cy),(cx,0)]
+
+# TODO: ought to use interior regions to reduce bucket resolution
+
 
 meshname = 'urban.msh' # if None then anuga won't generate_mesh
 
-mesh = anuga.create_mesh_from_regions(extent,boundary_tags={'outside':[0,1,2,3]},
+mesh = anuga.create_mesh_from_regions(full_extent,boundary_tags={'outer boundary':[0,1,2,3]},
   maximum_triangle_area=mesh_resolution, breaklines=breaklines, filename=meshname)
   
-
 """
 
 Domain creation
 
+Could start out with the floodplain dry (stage equal to elevation perhaps),
+although it might converge faster if adding the steady-state water depth
+(known analytically if we can neglect the buildings). 
+Alternatively, could set a constant value (to check what happens when the water reaches
+a bucket that isn't quite empy).
+
+
+
 """
 
+domain = anuga.create_domain_from_file(meshname)
 
+domain.set_flow_algorithm(method)
 
+domain.set_quantity('stage',cliff_fall) # start out dry? Oh wait..
+domain.set_quantity('friction',manning_coefficient)
+domain.set_quantity('elevation',elevation)
 
+domain.set_name('urban') # .sww output file
+domain.set_datadir('.') # current working directory
 
+domain.set_boundary({'outer boundary': anuga.Reflective_boundary(domain)}) # hard walls
+
+from anuga import Inlet_operator
+left_edge = [(0,cy),(0,0)]
+Inlet_operator(domain,left_edge,discharge) # set up constant water inflow
 
 """
 
-Can compare plot with fig. 8 of Sanders et al. to check elevation looks sensible
+Run the simulation
 
 """
+
+t1 = simulation_time 
+#t1 = 1000
+
+for t in domain.evolve(yieldstep=20,finaltime=t1):
+  print domain.timestepping_statistics()
+  
+
+# Although the output is already saved (in .sww using NetCDF) it is nice to 
+# reformat to permit taking a quick check (using "display" on UNIX) of the final status.
+
+# but would be nicer still to extract final timestep more directly..
+
+from anuga import plot_utils as util
+util.Make_Geotif('urban.sww',output_quantities=['depth'],myTimeStep='last',
+  CellSize=1.0,EPSG_CODE=32756,bounding_polygon=full_extent,k_nearest_neighbours=1)
+
+"""
+
+Can compare plot with fig. 8 of Sanders et al. to check everything looks sensible
+
+"""
+
 if display_figure:
   import matplotlib.pyplot as plt
   from matplotlib.patches import PathPatch
@@ -196,6 +237,8 @@ if display_figure:
   # check the buildings (and cliff) align with expectations
   shapes = Path.make_compound_path(town,Path(cliff)) # town + cliff
   ax.add_patch(PathPatch(shapes,fill=None,linewidth=0.5,color='black',alpha=0.8,linestyle='dashed'))
+  
+  # Would like a second subplot, showing final water depth and flow vectors
   
   plt.show()
   
