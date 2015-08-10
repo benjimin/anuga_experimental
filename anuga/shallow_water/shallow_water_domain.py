@@ -2070,6 +2070,7 @@ class Domain(Generic_Domain):
 
             # Update reference stage  / height / alpha_x / alpha_y from volume quantities
             #assert num.all(self.quantities['vol'].centroid_values>=0.)
+
             self.subgrid_data.set_quantities_from_subgrid_volume_quantities()
             
             # Do extrapolation step

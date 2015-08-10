@@ -235,9 +235,13 @@ class Test_subgrid_data(unittest.TestCase):
             (real_elevation-stage_at_refdepth0).min() + reference_elevation)
         assert numpy.allclose(edge_table[0,-1],
             reference_elevation + max_reference_depth )
-        assert numpy.allclose(edge_table[0,-2], 
-            (real_elevation-stage_at_refdepth0).max() +\
-             reference_elevation + upper_depth_offset)
+
+        ## FIXME: We have been changing the second-last table value, so I
+        ##        comment this out for now, but add it back if a method is
+        ##        finalised.
+        #assert numpy.allclose(edge_table[0,-2], 
+        #    (real_elevation-stage_at_refdepth0).max() +\
+        #     reference_elevation + upper_depth_offset)
 
         # Smallest edge length should have at least one subgrid point wet
         min_length_error = \
