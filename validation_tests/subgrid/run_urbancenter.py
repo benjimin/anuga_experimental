@@ -19,7 +19,7 @@ display_points = 50000 # number of elevation samples
 
 # configurable parameters of the solver: 
 
-method = 'DE1' # method might be DE1 or subgrid.
+method = 'subgrid' # method might be DE1 or subgrid.
 
 mesh_resolution = 0.5*(50)**2   # m^2, minimum triangle area
 
@@ -149,7 +149,7 @@ floodplain =  [(0,0),(0,cy),(cx,cy),(cx,0)]
 cx += bucket_width
 full_extent = [(0,0),(0,cy),(cx,cy),(cx,0)]
 
-# TODO: ought to use interior regions to reduce bucket resolution
+# TODO: ought to use interior regions to reduce bucket resolution (although may already be happening?)
 
 
 meshname = 'urban.msh' # if None then anuga won't generate_mesh
