@@ -21,7 +21,7 @@ display_points = 50000 # number of elevation samples
 
 method = 'DE1' # method might be DE1 or subgrid.
 
-mesh_resolution = 0.5*(100)**2   # m^2, minimum triangle area
+mesh_resolution = 0.5*(50)**2   # m^2, minimum triangle area
 
 breaklines_around_buildings = True # Boolean, whether the mesh should conform with urban planning
 
@@ -33,8 +33,8 @@ breaklines_around_buildings = True # Boolean, whether the mesh should conform wi
 building_height = 2.5 # metres (should exceed 1.15m)
 
 cliff_fall = -10 # metres (substitute for over-fall boundary-condition)
-bucket_width = 50 # m (extends right edge of domain)
-
+bucket_width = 500 # m (extends right edge of domain)
+# nb: must fit a couple million cubic metres, i.e. width*500m*fall >> discharge*time
 
 
 # scenario constants:  (refer to pg.30-31 of citation, do not change)
@@ -164,8 +164,8 @@ Domain creation
 Could start out with the floodplain dry (stage equal to elevation perhaps),
 although it might converge faster if adding the steady-state water depth
 (known analytically if we can neglect the buildings). 
-Alternatively, could set a constant value (to check what happens when the water reaches
-a bucket that isn't quite empy).
+Alternatively, could set a constant value (to see what happens when the flow reaches
+a bucket that isn't quite empty).
 
 
 
@@ -195,9 +195,8 @@ Run the simulation
 """
 
 t1 = simulation_time 
-t1 = 400
 
-for t in domain.evolve(yieldstep=20,finaltime=t1):
+for t in domain.evolve(yieldstep=50,finaltime=t1):
   print domain.timestepping_statistics()
 
 
@@ -218,15 +217,19 @@ if display_figure:
   import matplotlib.pyplot as plt
   from matplotlib.patches import PathPatch
   fig = plt.figure()
-  padding = 30
-  xl,yl = [-padding,cx+padding],[-padding,cy+padding] # plot extent
+  
+  def subfig(code,label):
+    padding = 30
+    xl,yl = [-padding,cx+padding],[-padding,cy+padding] # plot extent
+    ax = fig.add_subplot(code,aspect='equal') # set aspect ratio
+    plt.title(label)
+    plt.xlim(xl)
+    plt.ylim(yl)
+    return ax
   
   
   # first subplot tests the setup prior to the domain existing.
-  ax1 = fig.add_subplot(311,aspect='equal') # set aspect ratio
-  plt.title('Set-up')
-  plt.xlim(xl)
-  plt.ylim(yl)
+  ax1 = subfig(311,'Set-up')
   
   # randomly test elevation function
   sx,sy = floodplain_size
@@ -248,11 +251,8 @@ if display_figure:
 
 
 
-  # second subplot tests the results from the final time-step
-  ax2 = fig.add_subplot(312,aspect='equal') # set aspect ratio
-  plt.title('Results')
-  plt.xlim(xl)
-  plt.ylim(yl)
+  # second and third subplots test the results from the final time-step
+  ax2 = subfig(312,'Raw results')
   
   # obtain water depth
   water_depth = domain.get_quantity('height')
@@ -262,94 +262,70 @@ if display_figure:
   plt.tripcolor(x,y,triangles,values,shading='gouraud',alpha=0.8)
   plt.colorbar()
   
-  # get centroid coordinates
+  # show momenta at centroids
   centx,centy = np.hsplit(domain.get_centroid_coordinates(),2)
-  
   u = domain.get_quantity('xmomentum').get_values(location='centroids')
   v = domain.get_quantity('ymomentum').get_values(location='centroids')
-  
   plt.quiver(centx,centy,u,v,alpha=0.6)
   
 
 
-  # why does interpolation become unstable for large (not small) time periods?
 
+  ax3 = subfig(313,'Interpolated results')
+  
+  def interpolate(quantity,x=None,y=None): # smooth interpolation
+    cx,cy = np.hsplit(domain.get_centroid_coordinates(),2) # centroid coordinates
+    cz = quantity.get_values(location='centroids') # centroid quantity-values
+    from scipy.interpolate import Rbf # Radial-basis-function interpolation method
+    return Rbf(cx,cy,cz,function='cubic') # choose cubics for those basis functions
 
-  # third subplot 
-  ax2 = fig.add_subplot(313,aspect='equal') # set aspect ratio
-  plt.title('Interpolation')
-  plt.xlim(xl)
-  plt.ylim(yl)
+  def grid(i): # regular grid over domain with given increment
+    return np.meshgrid(np.arange(0,sx,i),np.arange(0,sy,i))
   
-  
-  # interpolate water depth, from centroid values, using radial basis functions
   water_depth = domain.get_quantity('stage') - domain.get_quantity('elevation')
-  from scipy.interpolate import Rbf
-  depth = Rbf(centx,centy,water_depth.get_values(location='centroids'))
   
   # produce image of smoothly-interpolated water depth
-  i = 5
-  X,Y = np.meshgrid(np.arange(0,sx,i),np.arange(0,sy,i))
-  Z = depth(X,Y)
-  plt.pcolor(X,Y,Z)
+  X,Y = grid(5)
+  Z = interpolate(water_depth)
+  plt.pcolormesh(X,Y,Z(X,Y),shading='gouraud',cmap='gist_rainbow')#vmax=1.15,vmin=0.45)
+  # tries to match colors from paper.
+  
   plt.colorbar()
   
-  # lightly indicate centroid positions
-  plt.scatter(centx,centy,s=5,marker='x',alpha=0.2)
+  # present the water velocities
+  u = interpolate(domain.get_quantity('xmomentum')/water_depth)
+  v = interpolate(domain.get_quantity('ymomentum')/water_depth)
+  X,Y = grid(30)
+  plt.quiver(X,Y,u(X,Y),v(X,Y),alpha=0.6)
+  # might prefer a streamline plot?
   
-  # interpolate the velocities also.
-  # note: 
-
-  xvel = domain.get_quantity('xmomentum')/water_depth
-  yvel = domain.get_quantity('ymomentum')/water_depth
-  u = xvel.get_values(location='centroids')
-  v = yvel.get_values(location='centroids')
+  # superimpose buildings and cliff again
+  ax3.add_patch(PathPatch(shapes,fill=None,linewidth=0.5,color='black',alpha=0.8))
   
-  i = 20 # interval at which to place quivers
-  X,Y = np.meshgrid(np.arange(0,sx,i),np.arange(0,sy,i)) # grid for placing quivers
-  U = Rbf(centx,centy,u)
-  V = Rbf(centx,centy,v) # interpolate onto grid using radial basis functions
-  plt.quiver(X,Y,U(X,Y),V(X,Y),alpha=0.6)
   
-  # would probably prefer a streamline plot?
   
-
   
-  plt.show()
+  # Sanders et. al. fig.9
   
-
-
-  """
-  # interpolate separately within different triangles
-  plt.tripcolor(x,y,triangles,values,alpha=0.8)
+  # construct grids
+  i = 2
+  j = 20
+  x,y = np.meshgrid(np.arange(550,950,i),np.arange(75,425,i))
+  X,Y = np.meshgrid(np.arange(550,950,j),np.arange(75,425,j))
+  
+  # configure plot
+  fig = plt.figure()
+  ax = fig.add_subplot(111,aspect='equal') # set aspect ratio
+  ax.set_xlim(550,950)
+  ax.set_ylim(75,425)
+  
+  # draw
+  plt.pcolormesh(x,y,Z(x,y),cmap='gist_rainbow')
   plt.colorbar()
+  plt.quiver(X,Y,u(X,Y),v(X,Y),alpha=0.6)
+  ax.add_patch(PathPatch(shapes,fill=None,linewidth=1,color='black',alpha=0.8))
   
-  # keep mesh visible
-  plt.triplot(x,y,triangles,'-',color='k',alpha=0.1) 
 
-  """
 
-  """
-  # keep mesh visible
-  plt.triplot(x,y,triangles,'-',color='k',alpha=0.1) 
-  
-  # quiver plot of flow field
-  
-  # obtain water velocity
-  xvel = domain.get_quantity('xmomentum')/water_depth
-  yvel = domain.get_quantity('ymomentum')/water_depth
-  u = xvel.get_values()
-  v = xvel.get_values()
-  
-  # need to get both components and smoothly interpolate first.
-  
-  i = 20 # interval at which to place quivers
-  X,Y = np.meshgrid(np.arange(0,sx,i),np.arange(0,sy,i)) # grid for placing quivers
-  U = Rbf(x,y,u)(X,Y)
-  V = Rbf(x,y,v)(X,Y) # interpolate onto grid using radial basis functions
-  plt.quiver(X,Y,U,V)
+  plt.show() # pause for a look at the outputs
 
-  
-  
-    
-  """
