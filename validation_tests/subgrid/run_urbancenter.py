@@ -177,10 +177,11 @@ domain.set_flow_algorithm(method)
 
 domain.set_quantity('stage',cliff_fall) # start out dry? Oh wait..
 domain.set_quantity('friction',manning_coefficient)
-domain.set_quantity('elevation',elevation)
+domain.set_quantity('elevation',elevation, location='centroids')
 
 domain.set_name('urban') # .sww output file
 domain.set_datadir('.') # current working directory
+domain.set_store_vertices_uniquely()
 
 domain.set_boundary({'outer boundary': anuga.Reflective_boundary(domain)}) # hard walls
 
