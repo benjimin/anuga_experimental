@@ -21,7 +21,7 @@ display_points = 50000 # number of elevation samples
 
 method = 'DE1' # method might be DE1 or subgrid (DE_SG).
 
-mesh_resolution = 0.5*(50)**2   # m^2, minimum triangle area
+mesh_resolution = 50 #0.5*(50)**2   # m^2, minimum triangle area
 
 breaklines_around_buildings = True # Boolean, whether the mesh should conform with urban planning
 
@@ -195,6 +195,7 @@ Run the simulation
 """
 
 t1 = simulation_time 
+t1 = 30
 
 for t in domain.evolve(yieldstep=50,finaltime=t1):
   print domain.timestepping_statistics()
@@ -269,7 +270,7 @@ if display_figure:
   plt.quiver(centx,centy,u,v,alpha=0.6)
   
 
-
+  """  
 
   ax3 = subfig(313,'Interpolated results')
   
@@ -287,7 +288,7 @@ if display_figure:
   # produce image of smoothly-interpolated water depth
   X,Y = grid(5)
   Z = interpolate(water_depth)
-  plt.pcolormesh(X,Y,Z(X,Y),shading='gouraud',cmap='gist_rainbow')#vmax=1.15,vmin=0.45)
+  plt.pcolormesh(X,Y,Z(X,Y),shading='gouraud',cmap='gist_rainbow')
   # tries to match colors from paper.
   
   plt.colorbar()
@@ -303,7 +304,7 @@ if display_figure:
   ax3.add_patch(PathPatch(shapes,fill=None,linewidth=0.5,color='black',alpha=0.8))
   
   
-  
+
   
   # Sanders et. al. fig.9
   
@@ -320,12 +321,12 @@ if display_figure:
   ax.set_ylim(75,425)
   
   # draw
-  plt.pcolormesh(x,y,Z(x,y),cmap='gist_rainbow')
+  plt.pcolormesh(x,y,Z(x,y),cmap='gist_rainbow_r',vmax=1.15,vmin=0.45)
   plt.colorbar()
   plt.quiver(X,Y,u(X,Y),v(X,Y),alpha=0.6)
   ax.add_patch(PathPatch(shapes,fill=None,linewidth=1,color='black',alpha=0.8))
   
-
+"""
 
   plt.show() # pause for a look at the outputs
 
