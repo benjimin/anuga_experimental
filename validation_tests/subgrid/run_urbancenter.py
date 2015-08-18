@@ -158,8 +158,13 @@ full_extent = [(0,0),(0,cy),(cx,cy),(cx,0)]
 
 meshname = 'urban.msh' # if None then anuga won't generate_mesh
 
+regionPtAreas = [ [1., 1., 80.0], # A point inside the left region, with a reasonable triangle max area
+                  [cx - 1., cy - 1., 1000.] # A point inside the basin, with a large triangle max area
+                ]
+
 mesh = anuga.create_mesh_from_regions(full_extent,boundary_tags={'outer boundary':[0,1,2,3]},
-  maximum_triangle_area=mesh_resolution, breaklines=breaklines, filename=meshname)
+  maximum_triangle_area=mesh_resolution, breaklines=breaklines, filename=meshname,
+  regionPtAreas = regionPtAreas)
   
 """
 
