@@ -12,20 +12,24 @@ with anisotropic porosity for urban flood modeling, J.Hydrol. (2008) 362, 19-38.
 
 # testing options:
 
-display_figure = True # whether to show a diagram of the scenario
+display_figure = False # whether to show a diagram of the scenario
 display_points = 50000 # number of elevation samples
 
 
 
 # configurable parameters of the solver: 
 
-method = 'DE1' # method might be DE1 or subgrid (DE_SG).
+method = 'DE1' # method might be discontinuous-elevation (DE1) or subgrid (DE_SG).
 
-mesh_resolution = 50 #0.5*(50)**2   # m^2, minimum triangle area
+mesh_resolution = 80 #0.5*(50)**2   # m^2, maximum triangle area
 
 breaklines_around_buildings = True # Boolean, whether the mesh should conform with urban planning
 
 
+
+# NB: Sanders et. al. use max area constraints of 80m2 or 950m2,
+# resulting in 1257 to 14640 triangles for the plain.
+# Elsewhere (fig.4) they consider 25, 500, or 10000 m2 with the same-size buildings.
 
 
 # extra scenario constants:
@@ -178,10 +182,14 @@ domain.set_flow_algorithm(method)
 domain.set_quantity('stage',cliff_fall) # start out dry? Oh wait..
 domain.set_quantity('friction',manning_coefficient)
 domain.set_quantity('elevation',elevation, location='centroids')
+# Note assigning elev. @ centroids not vertices is critical to avoid
+# smoothing, since deliberately aligned vertices onto breaklines
+# where discontinuities are intended.
 
 domain.set_name('urban') # .sww output file
 domain.set_datadir('.') # current working directory
-domain.set_store_vertices_uniquely()
+
+domain.set_store_vertices_uniquely() #----------------------------------------------------------------
 
 domain.set_boundary({'outer boundary': anuga.Reflective_boundary(domain)}) # hard walls
 
@@ -191,23 +199,38 @@ Inlet_operator(domain,left_edge,discharge) # set up constant water inflow
 
 """
 
+Subgrid topography
+
+Precompute tables relating water stage to volume, etc.
+
+The tables are based on a prior constant approximation for the stage gradients.
+In this scenario, the steady-state stage gradients should roughly match the bed-slope
+(which in turn may crudely be approximated as zero). However, the average bed-slope  
+would make a poor approximation for cells that straddle the boundaries of buildings.
+
+"""
+
+# express the constant as a vectorised function
+friction = lambda x,y: manning_coefficient + 0*x
+
+if (domain.flow_algorithm=='DE_SG'):
+  domain.subgrid_data.make_subgrid_tables(elevation,friction,
+    reference_gradient_type='zero')
+  domain.subgrid_data.set_subgrid_volume_quantities_from_reference_quantities()
+
+
+"""
+
 Run the simulation
 
 """
 
 t1 = simulation_time 
-t1 = 30
+#t1 = 300 # quicker debugging
 
 for t in domain.evolve(yieldstep=50,finaltime=t1):
   print domain.timestepping_statistics()
 
-
-
-# Although the output is already saved (in .sww using NetCDF) there is the option to 
-# reformat as .tif for a quick check (using "display" on UNIX) of the final status:
-#from anuga import plot_utils as util
-#util.Make_Geotif('urban.sww',output_quantities=['depth'],myTimeStep='last',
-#  CellSize=1.0,EPSG_CODE=32756,bounding_polygon=full_extent,k_nearest_neighbours=1)
 
 """
 
@@ -215,27 +238,19 @@ Can compare plot with fig. 8 of Sanders et al. to check everything looks sensibl
 
 """
 
-if display_figure:
-  import matplotlib.pyplot as plt
-  from matplotlib.patches import PathPatch
-  fig = plt.figure()
-  
-  def subfig(code,label):
-    padding = 30
-    xl,yl = [-padding,cx+padding],[-padding,cy+padding] # plot extent
-    ax = fig.add_subplot(code,aspect='equal') # set aspect ratio
-    plt.title(label)
-    plt.xlim(xl)
-    plt.ylim(yl)
-    return ax
-  
-  
-  # first subplot tests the setup prior to the domain existing.
-  ax1 = subfig(311,'Set-up')
+# domain to plot
+sx,sy = floodplain_size
+sx += bucket_width
+
+
+def draw_outlines(ax,*args): # draw buildings (and cliff) 
+  shapes = Path.make_compound_path(town,Path(cliff)) # town + cliff
+  ax.add_patch(PathPatch(shapes,fill=None,*args))
+
+
+def mesh_elev(ax1): # show the setup prior to the domain existing.
   
   # randomly test elevation function
-  sx,sy = floodplain_size
-  sx += bucket_width
   x = np.random.rand(display_points)*sx
   y = np.random.rand(display_points)*sy  
   plt.scatter(x,y,c=elevation(x,y),alpha=0.5,cmap='Paired',linewidth=0, marker='.')
@@ -247,14 +262,11 @@ if display_figure:
   ax1.add_patch(PathPatch(Path.make_compound_path(*paths),fill=None,alpha=0.2))
   
   # check the buildings (and cliff) align with expectations
-  shapes = Path.make_compound_path(town,Path(cliff)) # town + cliff
-  ax1.add_patch(PathPatch(shapes,fill=None,linewidth=0.5,color='black',alpha=0.8,linestyle='dashed'))
+  draw_outlines(ax1) # linewidth=0.5,color='black',alpha=0.8,linestyle='dashed' ?
   
 
 
-
-  # second and third subplots test the results from the final time-step
-  ax2 = subfig(312,'Raw results')
+def triangulation(ax2): # show the raw output from the final time-step
   
   # obtain water depth
   water_depth = domain.get_quantity('height')
@@ -271,18 +283,20 @@ if display_figure:
   plt.quiver(centx,centy,u,v,alpha=0.6)
   
 
-  """  
 
-  ax3 = subfig(313,'Interpolated results')
-  
-  def interpolate(quantity,x=None,y=None): # smooth interpolation
+def interpolate(quantity,x=None,y=None): # smooth interpolation
     cx,cy = np.hsplit(domain.get_centroid_coordinates(),2) # centroid coordinates
     cz = quantity.get_values(location='centroids') # centroid quantity-values
     from scipy.interpolate import Rbf # Radial-basis-function interpolation method
     return Rbf(cx,cy,cz,function='cubic') # choose cubics for those basis functions
 
-  def grid(i): # regular grid over domain with given increment
+def grid(i): # regular grid over domain with given increment
     return np.meshgrid(np.arange(0,sx,i),np.arange(0,sy,i))
+
+
+def interp(ax3): # smooth interpolation of results
+  
+
   
   water_depth = domain.get_quantity('stage') - domain.get_quantity('elevation')
   
@@ -302,18 +316,22 @@ if display_figure:
   # might prefer a streamline plot?
   
   # superimpose buildings and cliff again
-  ax3.add_patch(PathPatch(shapes,fill=None,linewidth=0.5,color='black',alpha=0.8))
+  draw_outlines(ax3) # linewidth=0.5,color='black',alpha=0.8 ?
   
   
-
-  
-  # Sanders et. al. fig.9
+def closeup():  # Sanders et. al. fig.9
   
   # construct grids
   i = 2
   j = 20
   x,y = np.meshgrid(np.arange(550,950,i),np.arange(75,425,i))
   X,Y = np.meshgrid(np.arange(550,950,j),np.arange(75,425,j))
+  
+  # gather data
+  water_depth = domain.get_quantity('height')
+  u = interpolate(domain.get_quantity('xmomentum')/water_depth)
+  v = interpolate(domain.get_quantity('ymomentum')/water_depth)
+  Z = interpolate(water_depth)
   
   # configure plot
   fig = plt.figure()
@@ -325,9 +343,35 @@ if display_figure:
   plt.pcolormesh(x,y,Z(x,y),cmap='gist_rainbow_r',vmax=1.15,vmin=0.45)
   plt.colorbar()
   plt.quiver(X,Y,u(X,Y),v(X,Y),alpha=0.6)
-  ax.add_patch(PathPatch(shapes,fill=None,linewidth=1,color='black',alpha=0.8))
+  draw_outlines(ax) # buildings
   
-"""
 
+
+
+
+if display_figure:
+  import matplotlib.pyplot as plt
+  from matplotlib.patches import PathPatch
+  fig = plt.figure()
+  
+  def subfig(total,index):
+    padding = 30
+    xl,yl = [-padding,cx+padding],[-padding,cy+padding] # plot extent
+    ax = fig.add_subplot(total,1,index,aspect='equal') # set aspect ratio
+    #plt.title(label)
+    plt.xlim(xl)
+    plt.ylim(yl)
+    return ax
+  
+  def do_plots(*args):
+    n = len(args)
+    for i,func in enumerate(args,start=1):
+      func(subfig(n,i))
+    
+
+  do_plots(mesh_elev,triangulation,interp)
+  #do_plots(mesh_elev,triangulation)
+  
+  closeup()
+  
   plt.show() # pause for a look at the outputs
-
