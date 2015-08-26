@@ -35,8 +35,8 @@ cross_section_amplitude = 4 # m
 
 bed_drop_over_semicircle = 0 # m. 
 pond_incision_depth = -30 # m
-pond_width = 10#00 # m
-pond_length = 10#00 # m
+pond_width = 1000 # m
+pond_length = 1000 # m
 
 # initial values
 
@@ -156,7 +156,6 @@ full_extent = ponds_area[:2] + u_bend_area + ponds_area[2:] # T-shaped domain
 full_extent += [(inner_radius,south),(inner_radius,-arm_length) , (-inner_radius,-arm_length),(-inner_radius,south)]
 
 
-
 meshfile = 'ubend.msh'
 mesh = anuga.create_mesh_from_regions(full_extent,
         boundary_tags={'outer boundary':range(len(full_extent))},
@@ -165,22 +164,15 @@ mesh = anuga.create_mesh_from_regions(full_extent,
 domain = anuga.create_domain_from_file(meshfile)
 
 
-domain.set_quantity('elevation',elev,location='centroids') # assign from centroid positions instead of smoothing
+xl,yl = map(min,zip(*full_extent))
+elev2 = lambda x,y: elev(x+xl,y+yl)
+
+domain.set_quantity('elevation',elev2,location='centroids') # assign from centroid positions instead of smoothing
 domain.set_quantity('friction',manning_coefficient)
 domain.set_quantity('stage',initial_stage)
 
 
-import re
-print filter(re.compile('.*ref.*').match,dir(mesh))
-print filter(re.compile('.*ref.*').match,dir(domain))
-#print dir(domain)
 
-print domain.geo_reference
-print mesh.geo_reference
-print mesh.geo_reference==domain.geo_reference
-print dir(domain.geo_reference)
-
-quit()
 
 
 import matplotlib.pyplot as plt
@@ -199,7 +191,7 @@ x,y = zip(*pts) #x,y = zip(*full_extent) inapplicable due to internal transforma
 """
 
 x,y,values,triangles = domain.get_quantity('elevation').get_vertex_values(smooth=False)
-plt.tripcolor(x,y,triangles,elev(x,y),shading='gouraud',alpha=0.2)
+plt.tripcolor(x,y,triangles,values,shading='gouraud',alpha=0.2)
 print min(values),max(values)
 
 
