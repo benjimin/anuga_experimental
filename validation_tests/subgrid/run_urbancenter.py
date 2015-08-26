@@ -12,18 +12,22 @@ with anisotropic porosity for urban flood modeling, J.Hydrol. (2008) 362, 19-38.
 
 # testing options:
 
-display_figure = False # whether to show a diagram of the scenario
-display_points = 50000 # number of elevation samples
+display_figure = True # whether to show a diagram of the scenario
+display_points = 5000 # number of elevation samples
 
 
 
 # configurable parameters of the solver: 
 
+
 method = 'DE1' # method might be discontinuous-elevation (DE1) or subgrid (DE_SG).
 
-mesh_resolution = 80 #0.5*(50)**2   # m^2, maximum triangle area
+mesh_resolution = 800 #0.5*(50)**2   # m^2, maximum triangle area
 
-breaklines_around_buildings = True # Boolean, whether the mesh should conform with urban planning
+higher_resolution_near_centre = 50 # None, or value in m^2. Say, 10
+higher_resolution_padding_width = 50 # m, width of padding of hi-res region
+
+breaklines_around_buildings = False # Boolean, whether the mesh should conform with urban planning
 
 
 
@@ -55,6 +59,39 @@ discharge = 400 # cubic metres per second at upstream (left) boundary
 simulation_time = 4000 # seconds (i.e. to approximately reach steady state)
 
 
+"""
+Permit setting options for the solver from the command line,
+to override defaults chosen above.
+
+e.g. python run_urbancenter.py --res 50 --subgrid
+
+This is to facilitate batch comparisons of solvers.
+
+"""
+
+import sys
+import getopt
+opts,args = getopt.getopt(sys.argv[1:], "", ["subgrid","res=","breaklines","hires="])
+for opt,arg in opts:
+  if opt == "--subgrid":
+    method = "DE_SG"
+  elif opt == "--res":
+    mesh_resolution = float(arg) 
+  elif opt == "--breaklines":
+    breaklines_around_buildings = True
+  elif opt == "--hires":
+    higher_resolution_near_centre = float(arg)
+
+
+
+# Now that settings are finalised, give a label for the run.
+name = "urban_"        
+name += "SG" if method == "DE_SG" else method
+if breaklines_around_buildings: name += "b"
+name += "_" + str(int(mesh_resolution))
+if higher_resolution_near_centre: name += "_" + str(int(higher_resolution_near_centre))
+
+print name
 
 """
 
@@ -144,27 +181,39 @@ if breaklines_around_buildings:
 
 Mesh generation.
 
+
 """
 
-import anuga
+# define hi-res region
+dx,dy = 0.5*building_size + building_spacing*izero + higher_resolution_padding_width
+polygon_vertices = [(-dx,dy),(dx,dy),(dx,-dy),(-dx,-dy),(-dx,dy)]
+higher_resolution = Path(polygon_vertices,closed=True).transformed(placement)
+
+# conditionally declare implicitly-closed hi-res region for mesh algorithm
+hires = higher_resolution_near_centre
+assert hires is None or hires < mesh_resolution
+interior_regions = [(higher_resolution.to_polygons()[0], hires)] if hires else []
+
+
+
 
 # implicitly-closed polygon enclosing the floodplain plus the basin below the cliff
 floodplain =  [(0,0),(0,cy),(cx,cy),(cx,0)]
 cx += bucket_width
 full_extent = [(0,0),(0,cy),(cx,cy),(cx,0)]
 
-# TODO: ought to use interior regions to reduce bucket resolution (although may already be happening?)
+# BREAK EVERYTHING WITH NEXT LINE
+full_extent = [(-750,0),(-750,cy),(cx,cy),(cx,-250)] # testing origin in middle of extent
 
 
-meshname = 'urban.msh' # if None then anuga won't generate_mesh
 
-regionPtAreas = [ [1., 1., 80.0], # A point inside the left region, with a reasonable triangle max area
-                  [cx - 1., cy - 1., 1000.] # A point inside the basin, with a large triangle max area
-                ]
+import anuga
+
+meshname = name + '.msh' # if None then anuga won't generate_mesh
 
 mesh = anuga.create_mesh_from_regions(full_extent,boundary_tags={'outer boundary':[0,1,2,3]},
-  maximum_triangle_area=mesh_resolution, breaklines=breaklines, filename=meshname,
-  regionPtAreas = regionPtAreas)
+  maximum_triangle_area=mesh_resolution, breaklines=breaklines, filename=meshname, interior_regions=interior_regions)
+
   
 """
 
@@ -191,10 +240,10 @@ domain.set_quantity('elevation',elevation, location='centroids')
 # smoothing, since deliberately aligned vertices onto breaklines
 # where discontinuities are intended.
 
-domain.set_name('urban') # .sww output file
+domain.set_name(name) # .sww output file
 domain.set_datadir('.') # current working directory
 
-domain.set_store_vertices_uniquely() #----------------------------------------------------------------
+domain.set_store_vertices_uniquely() # store multiple values (extrapolated separately from every adjoining cell) at each vertex
 
 domain.set_boundary({'outer boundary': anuga.Reflective_boundary(domain)}) # hard walls
 
@@ -220,7 +269,10 @@ friction = lambda x,y: manning_coefficient + 0*x
 
 if (domain.flow_algorithm=='DE_SG'):
   domain.subgrid_data.make_subgrid_tables(elevation,friction,
-    reference_gradient_type='zero')
+    reference_gradient_type='zero',
+    approx_grid_spacing=[15.,15.], # this defines the subgrid resolution
+    max_reference_depth=25.0 # exceeds estimated maximum water depth, and "second max ref depth"..
+    )
   domain.subgrid_data.set_subgrid_volume_quantities_from_reference_quantities()
 
 
@@ -231,13 +283,14 @@ Run the simulation
 """
 
 t1 = simulation_time 
-#t1 = 300 # quicker debugging
+#t1 = 30 # quicker debugging
 
 for t in domain.evolve(yieldstep=50,finaltime=t1):
   print domain.timestepping_statistics()
 
 
 """
+---------------------------------------------------------------------------------
 
 Can compare plot with fig. 8 of Sanders et al. to check everything looks sensible
 
@@ -249,7 +302,7 @@ sx += bucket_width
 
 
 def draw_outlines(ax,*args): # draw buildings (and cliff) 
-  shapes = Path.make_compound_path(town,Path(cliff)) # town + cliff
+  shapes = Path.make_compound_path(town,Path(cliff),higher_resolution) # town + cliff
   ax.add_patch(PathPatch(shapes,fill=None,*args))
 
 
@@ -374,9 +427,9 @@ if display_figure:
       func(subfig(n,i))
     
 
-  do_plots(mesh_elev,triangulation,interp)
-  #do_plots(mesh_elev,triangulation)
+  #do_plots(mesh_elev,triangulation,interp)
+  do_plots(mesh_elev,triangulation)
   
-  closeup()
+  #closeup()
   
   plt.show() # pause for a look at the outputs
