@@ -22,31 +22,32 @@ according to the flow.
 
 """
 
-# scenario constants: (refer to pg.576 pf citation, do not change)
+# scenario constants: (refer to pg.576 of citation, do not change)
 
-bed_slope = 2e-4 # constant slope in flow direction
+bed_slope = 2e-4 # constant downhill slope in flow direction
 outer_radius = 320 # metres
 incision_width = 213 # m, maximum width of river before flooding onto plain
 manning_coefficient = 0.026 # m^(-1/3) s
 total_length = 960 # m
-cross_section_amplitude = 4 # m
+cross_section_amplitude = -4 # m
+total_drop = 0.30 # m, taken from fig.13 pg.577
+
+# initial values
+
+max_depth = 0.9 # m, at inflow/outflow (e.g., 3.9, 1.9 or 0.9; table 1, pg.576)
 
 # extra scenario constants: 
 
-bed_drop_over_semicircle = 0 # m. 
 pond_incision_depth = -30 # m
 pond_width = 1000 # m
 pond_length = 1000 # m
 
-# initial values
-
-upper_stage = -1.
-lower_stage = -2.
+time = 1000 # s, simulation time to achieve (an approximation of) convergence
 
 # solver parameters
 
 mesh_resolution = 0.5*(50**2) # m^2, maximum triangle area
-
+method = 'DE1'
 
 
 """
@@ -67,51 +68,60 @@ that the incision slightly deepens as the river approaches the bend, and deepens
 further as the river moves away from the bend. (This accumulates as a small
 discontinuity at the inside edge of the incision.) 
 
-The paper is not explicit about whether the slope continues through the bend itself.
-It does utilise a system of coordinates where the slope has the same effective
-length as either arm (i.e. a typical radius of ~203m). 
-
-It is not explicit (in the original publication) whether the slope continues through the 
-bend itself. It does however indicate (fig.13) that the steady-state stage (a proxy for
-elevation) varies by about 0.30m over the course of the U-bend (as though the semi-circle 
-had incorporated a couple hundred metres worth of slope). 
-
-The paper does adopt a system of coordinate where the semi-circle has
-the same "dimensionless" length as either arm.
-
-
+The original publication is not explicit about whether the slope continues through 
+the bend itself. It does however indicate (fig.13) the approximate amount that the
+steady-state stage differs between ends of the U-bend. This is a good proxy for
+the accumulated elevation offset, because the boundary conditions are described
+as imposing the same max water depth at each end of the U-bend, and the figure 
+also verifies that (to first order) the water has approximately the same (flat) 
+cross-section at either end. (The implication turns out to be that the semicircle 
+takes an effective length of 220m.)
 """
 
 inner_radius = outer_radius - incision_width
 arm_length = total_length - outer_radius
 
-psuedo = abs(bed_drop_over_semicircle)/bed_slope # calculate psuedo-distance around semi-circle
+
+# Calculate how the bed slope continues around the bend
+bed_drop_over_semicircle = total_drop - 2 * arm_length * bed_slope
+assert bed_slope>=0 and total_drop>=0 and bed_drop_over_semicircle>=0
+pseudo = bed_drop_over_semicircle/bed_slope # pseudo-length of semi-circle
 
 from math import pi
 import numpy as np
 
-# for the cross-section: in the upper half-space, function primarily of radial coordinate.
-#                        in the lower half-space, function primarily of absolute lateral displacement.
+
+
 
 # between the inside and outside radius spans a quarter period of a sinusoidal curve
 angular_freq = pi/(2*incision_width)
-sinusoid = lambda r: cross_section_amplitude * np.sin(angular_freq * (r - inner_radius))
+def sinusoid(r): 
+  return cross_section_amplitude * np.sin(angular_freq * (r - inner_radius))
 def cross_section(r,z):
   # note, cannot chain numpy inequalities a<r<b
   return np.where((inner_radius<r)&(r<outer_radius), sinusoid(r) - bed_slope * z, 0.)
-  
+
+
+# in the upper half-space, cross-section is a function primarily of radial coordinate.
 def elevation_for_bend(x,y):
   radius = np.sqrt(x**2+y**2) 
   theta = np.arctan2(y,x) # ranges from 0 (at right) to pi (at left) for y +ve.
-  return cross_section(radius, theta * psuedo/pi)
+  return cross_section(radius, theta * pseudo/pi)
 
-boundary_pond = lambda offset: np.where(offset < inner_radius, 0., pond_incision_depth)
+
+# in the lower half-space, cross-section is a function primarily of absolute lateral displacement.
+# additionally must incorporate the lakes which buffer the inflow/outflow water levels.
+def boundary_pond(offset): 
+  return np.where(offset < inner_radius, 0., pond_incision_depth)
 def elevation_for_straights(x,y):
   abs_x = np.fabs(x) # |x| is symmetric across y-axis
-  distance = y * np.sign(x) + arm_length + np.where(x < 0, psuedo, 0.) # from upstream pond
+  distance = y * np.sign(x) + arm_length + np.where(x < 0, pseudo, 0.) # dist. from upstream pond
   return np.where(y < -arm_length, boundary_pond(abs_x), cross_section(abs_x,distance))
-  
-elev = lambda x,y: np.where(y>0, elevation_for_bend(x,y), elevation_for_straights(x,y))
+
+
+
+def elevation(x,y): # overall  
+  return np.where(y>0, elevation_for_bend(x,y), elevation_for_straights(x,y))
  
 
 
@@ -136,10 +146,16 @@ can be, in terms of approximating the steady-state solution).
 """
 
 
+# initial values
 
-initial_stage = lambda x,y: np.where(x > 0, upper_stage, lower_stage)
+upper_stage = cross_section_amplitude + max_depth
+lower_stage = upper_stage - total_drop
+print cross_section_amplitude , lower_stage , upper_stage , 0.
+assert cross_section_amplitude < lower_stage < upper_stage < 0.
 
-friction = lambda x,y: manning_coefficient
+def initial_stage(x,y): return np.where(x > 0, upper_stage, lower_stage)
+
+
 
 
 
@@ -147,13 +163,15 @@ import anuga
 
 pond_radius = pond_width + inner_radius
 south = -(arm_length + pond_length)
-rectangle = lambda x1,y1,x2,y2: [(x1,y1),(x1,y2),(x2,y2),(x2,y1)]
+def rectangle(x1,y1,x2,y2): return [(x1,y1),(x1,y2),(x2,y2),(x2,y1)]
 u_bend_area = rectangle(-outer_radius, -arm_length, outer_radius, outer_radius)
 ponds_area = rectangle(-pond_radius, south, pond_radius, -arm_length)
 full_extent = ponds_area[:2] + u_bend_area + ponds_area[2:] # T-shaped domain
 
 # align the mesh to the (inside) pond edges using break-lines, or cut-out part of the region entirely
 full_extent += [(inner_radius,south),(inner_radius,-arm_length) , (-inner_radius,-arm_length),(-inner_radius,south)]
+#full_extent = map(list,full_extent) if tuples were a problem..
+
 
 
 meshfile = 'ubend.msh'
@@ -164,15 +182,62 @@ mesh = anuga.create_mesh_from_regions(full_extent,
 domain = anuga.create_domain_from_file(meshfile)
 
 
-xl,yl = map(min,zip(*full_extent))
-elev2 = lambda x,y: elev(x+xl,y+yl)
 
-domain.set_quantity('elevation',elev2,location='centroids') # assign from centroid positions instead of smoothing
+
+
+# shift to using internal coordinates
+# (ironically, losing numerical-precision due to facility designed to mitigate it)
+def translate(f): 
+  xll,yll = map(min,zip(*full_extent))
+  return lambda x,y: f(x+xll,y+yll)
+
+domain.set_quantity('elevation',translate(elevation),location='centroids') # assign from centroid positions instead of smoothing
 domain.set_quantity('friction',manning_coefficient)
-domain.set_quantity('stage',initial_stage)
+domain.set_quantity('stage',translate(initial_stage)) # smoothing here will assist convergence
 
 
 
+
+
+
+domain.set_flow_algorithm(method)
+
+domain.set_name('meander.sww')
+domain.set_datadir('.')
+domain.set_store_vertices_uniquely()
+
+domain.set_boundary({'outer boundary': anuga.Reflective_boundary(domain)}) # hard walls
+
+
+# run simulation
+for t in domain.evolve(yieldstep=10,finaltime=time):
+  print domain.timestepping_statistics()
+
+
+"""
+Current idea is not to set any inlet.
+
+Alternatively, could have a inlet and outlet. 
+
+But trying to balance flow rates to maintain surface levels... might be simpler just
+to make the operator for constant levels work with subgrid.
+
+So: question: regards the code for anuga.Inlet_operator.Inlet_operator, 
+is anything special about getting it to work for subgrid?
+
+Or.. could use flow rates as my independent variable?
+"""
+
+
+
+
+
+
+"""
+
+The paper plots results in a system of coordinates where the slope has the same effective
+length as either arm (i.e. a typical radius of ~203m). 
+"""
 
 
 import matplotlib.pyplot as plt
@@ -190,9 +255,10 @@ ax.add_patch(PathPatch(Path.make_compound_path(*paths),fill=None))
 x,y = zip(*pts) #x,y = zip(*full_extent) inapplicable due to internal transformation
 """
 
-x,y,values,triangles = domain.get_quantity('elevation').get_vertex_values(smooth=False)
-plt.tripcolor(x,y,triangles,values,shading='gouraud',alpha=0.2)
-print min(values),max(values)
+x,y,values,triangles = domain.get_quantity('height').get_vertex_values(smooth=False)
+plt.tripcolor(x,y,triangles,values,shading='gouraud',alpha=0.2,vmax=3)
+print 'Output value range',min(values),max(values)
+plt.colorbar()
 
 
 limits = lambda x: (min(x),max(x))
