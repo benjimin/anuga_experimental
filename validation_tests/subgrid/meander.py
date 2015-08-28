@@ -42,11 +42,14 @@ pond_incision_depth = -30 # m
 pond_width = 1000 # m
 pond_length = 1000 # m
 
-time = 1000 # s, simulation time to achieve (an approximation of) convergence
+# time-stepping options
+
+time = 1000 # s, total simulation time to produce (an approximation of) convergence
+time_between_output = 50 # s, temporal resolution of output
 
 # solver parameters
 
-mesh_resolution = 0.5*(50**2) # m^2, maximum triangle area
+mesh_resolution = 0.5*(20**2) # m^2, maximum triangle area
 method = 'DE1'
 
 
@@ -150,7 +153,7 @@ can be, in terms of approximating the steady-state solution).
 
 upper_stage = cross_section_amplitude + max_depth
 lower_stage = upper_stage - total_drop
-print cross_section_amplitude , lower_stage , upper_stage , 0.
+#print cross_section_amplitude , lower_stage , upper_stage , 0.
 assert cross_section_amplitude < lower_stage < upper_stage < 0.
 
 def initial_stage(x,y): return np.where(x > 0, upper_stage, lower_stage)
@@ -210,7 +213,7 @@ domain.set_boundary({'outer boundary': anuga.Reflective_boundary(domain)}) # har
 
 
 # run simulation
-for t in domain.evolve(yieldstep=10,finaltime=time):
+for t in domain.evolve(yieldstep=time_between_output,finaltime=time):
   print domain.timestepping_statistics()
 
 
@@ -240,30 +243,45 @@ length as either arm (i.e. a typical radius of ~203m).
 """
 
 
+raise SystemExit # skip plots
+
+
+
+
 import matplotlib.pyplot as plt
+
 
 
 fig = plt.figure()
 ax = fig.add_subplot(111,aspect='equal')
 
-"""
-from matplotlib.path import Path
+"""from matplotlib.path import Path
 from matplotlib.patches import PathPatch
 pts = mesh.getMeshVertices()
 paths = (Path([pts[i],pts[j],pts[k],pts[i]]) for i,j,k in mesh.getTriangulation())
 ax.add_patch(PathPatch(Path.make_compound_path(*paths),fill=None))
-x,y = zip(*pts) #x,y = zip(*full_extent) inapplicable due to internal transformation
-"""
+x,y = zip(*pts) #x,y = zip(*full_extent) inapplicable due to internal transformation"""
 
-x,y,values,triangles = domain.get_quantity('height').get_vertex_values(smooth=False)
+x,y,values,triangles = domain.get_quantity('stage').get_vertex_values(smooth=False)
 plt.tripcolor(x,y,triangles,values,shading='gouraud',alpha=0.2,vmax=3)
 print 'Output value range',min(values),max(values)
 plt.colorbar()
 
-
 limits = lambda x: (min(x),max(x))
 ax.set_xlim(*limits(x))
 ax.set_ylim(*limits(y))
+
+
+x,y = np.hsplit(domain.get_centroid_coordinates(),2)
+values = domain.get_quantity('stage').get_values(location='centroids')
+h = domain.get_quantity('height').get_values(location='centroids')
+def distance(x,y): # so-called "dimensionless distance"
+  return np.where(y>0, np.arctan2(y,x)/pi, np.where(x>0,y/arm_length,1-y/arm_length))+1
+fig = plt.figure()
+X,Y = translate(distance)(x,y)[h!=0], values[h!=0]
+plt.scatter(X,Y,alpha=0.2)
+
+
 plt.show()
 
 
