@@ -38,13 +38,13 @@ max_depth = 0.9 # m, at inflow/outflow (e.g., 3.9, 1.9 or 0.9; table 1, pg.576)
 
 # extra scenario constants: 
 
-pond_incision_depth = -30 # m
+pond_incision_depth = -8 # m
 pond_width = 1000 # m
 pond_length = 1000 # m
 
 # time-stepping options
 
-time = 1000 # s, total simulation time to produce (an approximation of) convergence
+time = 5000 # s, total simulation time to produce (an approximation of) convergence
 time_between_output = 50 # s, temporal resolution of output
 
 # solver parameters

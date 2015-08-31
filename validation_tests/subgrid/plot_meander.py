@@ -1,6 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
-
+import matplotlib.animation as ani
 
 filename = 'meander.sww'
 
@@ -17,72 +17,65 @@ ax = fig.add_subplot(111,aspect='equal')
 limits = lambda x: (min(x),max(x))
 ax.set_xlim(*limits(vx))
 ax.set_ylim(*limits(vy))"""
+
 fig,ax = plt.subplots()
-
-
-plt.tripcolor(vx,vy,v.vols,v.height[-1],shading='gouraud',alpha=0.9,vmax=4)
+i = -1 # final timestep
+w = [c.height[i]!=0] # wetted subset of cells
+plt.triplot(vx,vy,v.vols,alpha=0.1) # mesh background
+#plt.tripcolor(vx,vy,v.vols[w],v.height[i],shading='gouraud',alpha=0.9,vmax=4)
+plt.tripcolor(vx,vy,v.vols[w],v.stage[i],shading='gouraud',alpha=0.9,vmax=max(c.stage[i][w]),vmin=min(c.stage[i][w]))
 plt.colorbar()
+plt.quiver(cx[w],cy[w],c.xmom[i][w],c.ymom[i][w],alpha=0.35)
+ax.axis('tight')
+plt.show()
 
-plt.quiver(cx,cy,c.xvel[2],c.yvel[2],alpha=0.4)
+"""
+fig,ax = plt.subplots()
+limits = lambda x: (min(x),max(x))
+ax.set_xlim(*limits(vx))
+ax.set_ylim(*limits(vy))
+def start():
+  plt.triplot(vx,vy,v.vols,alpha=0.1) # mesh background 
+  seq=update(0)
+  #plt.colorbar(seq[0])
+  #ax.axis('equal')
+  return seq
+def update(i):
+  w = [c.height[i]!=0]
+  tri=plt.tripcolor(vx,vy,v.vols[w],v.height[i],shading='gouraud',alpha=0.9,vmax=4,animated=True)
+  #vec=plt.quiver(cx[w],cy[w],c.xvel[i][w],c.yvel[i][w],alpha=0.35,animated=True)
+  vec = plt.quiver([],[],[],[],animated=True)
+  return tri,vec
+hdl = ani.FuncAnimation(fig,update,frames=len(v.timeSlices),
+  init_func=start,blit=True,repeat=False,interval=500)
+plt.show()
+"""
 
-ax.axis('equal')
 
 
+
+# -- watch convergence of Stelling fig.13
 
 a = 640 # arm length
 from math import pi
 def distance(x,y): # so-called "dimensionless distance"
   return np.where(y>0, np.arctan2(y,x)/pi, np.where(x>0,y/a,1-y/a))+1
 
-"""
 
-for i in [0,-1]:
-  fig = plt.figure()
-  X = distance(cx,cy)  [c.height[i]!=0]
-  Y = c.stage[i]       [c.height[i]!=0]
-  plt.scatter(X,Y,alpha=0.4)
-  
-  
-fig = plt.figure()  
-for i in [0,-1]:  
-  X = distance(cx,cy)  [c.height[i]!=0]
-  Y = c.stage[i]       [c.height[i]!=0]
-  plt.scatter(X,Y,alpha=0.4)
-
-"""
-plt.show()
-
-#-------------------------
-#"""
-import matplotlib.pyplot as plt
-import matplotlib.animation as animation
-import numpy as np
-
-
-
-#--------------------------
 fig,ax = plt.subplots()
-
-sc = None
 def setup():
-  global sc
-  print "get ready!"
-  i = 0
-  X = distance(cx,cy)  [c.height[i]!=0]
-  Y = c.stage[i]       [c.height[i]!=0]
-  sc = ax.scatter(X,Y,animated=True)
+  seq = update(0)
   ax.axis('tight')
-  return sc,
+  return seq
 def update(i):
-  global sc
-  print "oooh",i
   X = distance(cx,cy)  [c.height[i]!=0]
   Y = c.stage[i]       [c.height[i]!=0]
-  sc = ax.scatter(X,Y,animated=True)
-  return sc,
+  plot = ax.scatter(X,Y,animated=True)
+  return plot, # as sequence
 
-import matplotlib.animation as ani
-reference_handle = ani.FuncAnimation(fig,update,interval=5,init_func=setup,blit=True,repeat=10)
+reference_handle = ani.FuncAnimation(fig,update,frames=len(v.timeSlices),
+  init_func=setup,blit=True,repeat=False,interval=50)
+  
 plt.show()
 
 
