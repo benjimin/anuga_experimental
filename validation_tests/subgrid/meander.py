@@ -38,18 +38,21 @@ max_depth = 0.9 # m, at inflow/outflow (e.g., 3.9, 1.9 or 0.9; table 1, pg.576)
 
 # extra scenario constants: 
 
-pond_incision_depth = -8 # m
+#pond_incision_depth = -8 # m
 pond_width = 1000 # m
 pond_length = 1000 # m
+delta = True # boolean, whether to try softening the pond transition; overrides depth.
 
 # time-stepping options
 
 time = 5000 # s, total simulation time to produce (an approximation of) convergence
-time_between_output = 50 # s, temporal resolution of output
+time_between_output = 100 # s, temporal resolution of output
 
 # solver parameters
 
-mesh_resolution = 0.5*(20**2) # m^2, maximum triangle area
+mesh_resolution = 0.5*(15**2) # m^2, maximum triangle area;
+                              # note Stelling uses squares of 20*20, 40*40 and 80*80 m^2,
+			      # albeit with 1m^2 subgrid.
 method = 'DE1'
 
 
@@ -113,14 +116,20 @@ def elevation_for_bend(x,y):
 
 
 # in the lower half-space, cross-section is a function primarily of absolute lateral displacement.
-# additionally must incorporate the lakes which buffer the inflow/outflow water levels.
-def boundary_pond(offset): 
-  return np.where(offset < inner_radius, 0., pond_incision_depth)
 def elevation_for_straights(x,y):
   abs_x = np.fabs(x) # |x| is symmetric across y-axis
   distance = y * np.sign(x) + arm_length + np.where(x < 0, pseudo, 0.) # dist. from upstream pond
-  return np.where(y < -arm_length, boundary_pond(abs_x), cross_section(abs_x,distance))
+  return np.where(y < -arm_length, boundary_pond(abs_x,distance), cross_section(abs_x,distance))
 
+
+# incorporate the lakes to buffer the inflow/outflow water levels.
+def boundary_pond(offset,*args): 
+  return np.where(offset < inner_radius, 0., pond_incision_depth) 
+if delta:
+  def boundary_pond(offset, distance):
+    drop = total_drop * (distance > 0) # binary
+    return np.where(offset < outer_radius, sinusoid(offset) - drop, cross_section_amplitude)
+  
 
 
 def elevation(x,y): # overall  
@@ -186,20 +195,24 @@ domain = anuga.create_domain_from_file(meshfile)
 
 
 
-
+# ------------- assign quantities ---
 
 # shift to using internal coordinates
-# (ironically, losing numerical-precision due to facility designed to mitigate it)
+# (ironically, losing numerical-precision due to a feature designed to mitigate such)
 def translate(f): 
   xll,yll = map(min,zip(*full_extent))
   return lambda x,y: f(x+xll,y+yll)
+  
+elevation = translate(elevation)
+initial_stage = translate(initial_stage)
 
-domain.set_quantity('elevation',translate(elevation),location='centroids') # assign from centroid positions instead of smoothing
+domain.set_quantity('elevation',elevation,location='centroids') # assign from centroid positions instead of smoothing
 domain.set_quantity('friction',manning_coefficient)
-domain.set_quantity('stage',translate(initial_stage)) # smoothing here will assist convergence
+domain.set_quantity('stage',initial_stage) # smoothing here will assist convergence
 
 
 
+# -------- set up solver -------
 
 
 
@@ -210,6 +223,18 @@ domain.set_datadir('.')
 domain.set_store_vertices_uniquely()
 
 domain.set_boundary({'outer boundary': anuga.Reflective_boundary(domain)}) # hard walls
+
+
+if method=='DE_SG': # prepare sub-grid tables
+  def friction(x,y): return manning_coefficient + 0*x # vectorised
+  kwargs = {'reference_gradient_type':'zero', 'max_reference_depth':10}
+  domain.subgrid_data.make_subgrid_tables(elevation,friction,**kwargs)
+  domain.subgrid_data.set_subgrid_volume_quantities_from_reference_quantities()
+
+
+
+
+
 
 
 # run simulation
