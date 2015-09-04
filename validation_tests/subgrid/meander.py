@@ -34,7 +34,7 @@ total_drop = 0.30 # m, taken from fig.13 pg.577
 
 # initial values
 
-max_depth = 0.9 # m, at inflow/outflow (e.g., 3.9, 1.9 or 0.9; table 1, pg.576)
+max_depth = 3.9 # m, at inflow/outflow (e.g., 3.9, 1.9 or 0.9; table 1, pg.576)
 
 # extra scenario constants: 
 

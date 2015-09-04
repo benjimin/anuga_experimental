@@ -20,7 +20,7 @@ plt.triplot(vx,vy,v.vols,alpha=0.1) # mesh background
 #plt.tripcolor(vx,vy,v.vols,v.elev,shading='gouraud',alpha=0.9) # elevation
 plt.tripcolor(vx,vy,v.vols[w],v.stage[i],shading='gouraud',alpha=0.9,vmax=max(c.stage[i][w]),vmin=min(c.stage[i][w])) # wet stage
 plt.colorbar()
-plt.quiver(cx[w],cy[w],c.xmom[i][w],c.ymom[i][w],alpha=0.3,color='white')
+plt.quiver(cx[w],cy[w],c.xmom[i][w],c.ymom[i][w],alpha=0.8,color='black')
 ax.axis('equal')
 plt.title('Final water stage (with momentum vectors)')
 plt.show()
