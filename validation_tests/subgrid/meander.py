@@ -34,13 +34,13 @@ total_drop = 0.30 # m, taken from fig.13 pg.577
 
 # initial values
 
-max_depth = 0.9 # m, at inflow/outflow (e.g., 3.9, 1.9 or 0.9; table 1, pg.576)
+max_depth = 1.9 # m, at inflow/outflow (e.g., 3.9, 1.9 or 0.9; table 1, pg.576)
 
 # extra scenario constants: 
 
 #pond_incision_depth = -8 # m
-pond_width = 1000 # m
-pond_length = 1000 # m
+pond_width = 100000 # m
+pond_length = 100000 # m
 delta = True # boolean, whether to try softening the pond transition; overrides depth.
 
 # time-stepping options

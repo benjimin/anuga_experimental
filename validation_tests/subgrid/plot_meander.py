@@ -13,6 +13,8 @@ cx,cy = c.x+c.xllcorner,c.y+c.yllcorner
 
 
 
+# --- basemap
+
 fig,ax = plt.subplots()
 i = -1 # final timestep
 w = [c.height[i]!=0] # wetted subset of cells
@@ -20,7 +22,10 @@ plt.triplot(vx,vy,v.vols,alpha=0.1) # mesh background
 #plt.tripcolor(vx,vy,v.vols,v.elev,shading='gouraud',alpha=0.9) # elevation
 plt.tripcolor(vx,vy,v.vols[w],v.stage[i],shading='gouraud',alpha=0.9,vmax=max(c.stage[i][w]),vmin=min(c.stage[i][w])) # wet stage
 plt.colorbar()
-plt.quiver(cx[w],cy[w],c.xmom[i][w],c.ymom[i][w],alpha=0.3,color='white')
+plt.quiver(cx[w],cy[w],c.xmom[i][w],c.ymom[i][w],alpha=0.3,color='white',scale_units='x',scale=0.1)
+# scale units can relate to the data, or pixels, or window. The scale is inverse of length per data.
+# ideally, I would want to automatically look at the distribution of (nonzero) speeds, and relate this to the mean triangle width..
+# whereas existing autoscale seems to struggle with wide distributions..
 ax.axis('equal')
 plt.title('Final water stage (with momentum vectors)')
 plt.show()
@@ -50,11 +55,13 @@ plt.show()
 
 def get_area(tri): # get area of any triangle cell
   p1,p2,p3 = ((vx[i],vy[i]) for i in tri) # triangle vertices
-  ds = lambda (x,y),(x2,y2): (abs(x-x2)+abs(y-y2))**(0.5) # distance
+  ds = lambda (x,y),(x2,y2): ((x-x2)**2+(y-y2)**2)**(0.5) # distance
   a,b,c = ds(p1,p2),ds(p2,p3),ds(p3,p1) # side lengths
   s = 0.5*(a+b+c) # semiperimeter
   return (s*(s-a)*(s-b)*(s-c))**(0.5) # Heron's formula
 areas = np.array(map(get_area,v.vols)) # all cells
+
+# areas = util.triangle_areas(v)
 
 volume = c.height * areas
 
@@ -64,7 +71,7 @@ lower = np.diff(volume[:,cx<0].sum(axis=1))
 t = (c.time[1:]+c.time[:-1])/2. # mid-timesteps
 fig,ax = plt.subplots()
 for y,txt in [(-total,'total leakage rate'),(-upper,'flow from east'),(lower,'flow to west')]:
-  ax.plot(t,y,label=txt)
+  ax.plot(t,y,label=txt,alpha=0.6)
 plt.legend()
 ax.set_ylabel('Flow rate (m^3/s)')
 ax.set_xlabel('Time (s)')
@@ -83,9 +90,9 @@ def distance(x,y): # so-called "dimensionless distance"
 fig,ax = plt.subplots()
 def setup():
   seq = update(0)
-  ax.axis('tight')
   ax.set_xlabel('Dimensionless distance')
   ax.set_ylabel('Water stage level: m')
+  ax.set_xlim(-1.5,4.5) # don't lose focus onto the furthest reaches of the ponds
   return seq
 def update(i):
   X = distance(cx,cy)  [c.height[i]!=0]

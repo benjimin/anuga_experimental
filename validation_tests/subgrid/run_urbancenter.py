@@ -202,9 +202,6 @@ floodplain =  [(0,0),(0,cy),(cx,cy),(cx,0)]
 cx += bucket_width
 full_extent = [(0,0),(0,cy),(cx,cy),(cx,0)]
 
-# BREAK EVERYTHING WITH NEXT LINE
-full_extent = [(-750,0),(-750,cy),(cx,cy),(cx,-250)] # testing origin in middle of extent
-
 
 
 import anuga
