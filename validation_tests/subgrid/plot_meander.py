@@ -22,7 +22,7 @@ plt.triplot(vx,vy,v.vols,alpha=0.1) # mesh background
 #plt.tripcolor(vx,vy,v.vols,v.elev,shading='gouraud',alpha=0.9) # elevation
 plt.tripcolor(vx,vy,v.vols[w],v.stage[i],shading='gouraud',alpha=0.9,vmax=max(c.stage[i][w]),vmin=min(c.stage[i][w])) # wet stage
 plt.colorbar()
-plt.quiver(cx[w],cy[w],c.xmom[i][w],c.ymom[i][w],alpha=0.3,color='white',scale_units='x',scale=0.1)
+plt.quiver(cx[w],cy[w],c.xmom[i][w],c.ymom[i][w],alpha=0.8,color='black',scale_units='x',scale=0.1)
 # scale units can relate to the data, or pixels, or window. The scale is inverse of length per data.
 # ideally, I would want to automatically look at the distribution of (nonzero) speeds, and relate this to the mean triangle width..
 # whereas existing autoscale seems to struggle with wide distributions..
