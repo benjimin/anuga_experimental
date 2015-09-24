@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
-filename = 'urban_DE1_800_50.sww'
+filename = 'urban_DE1_950.sww'
 
 
 """
@@ -93,7 +93,7 @@ def transect(ax):
   w,h = (5-1)*30+10, (5-1)*30+20
   radius = 0.5*(w**2+h**2)**0.5 + padding
   npoints = 10**5
-  interp = interpolate(v,centroid_values=c.stage,method='stepwise') # <---
+  interp = interpolate(v,centroid_values=c.elev,method='stepwise') # <---
   from math import pi
   theta = np.linspace(0,2*pi,npoints)
   X = radius*np.cos(theta)+750

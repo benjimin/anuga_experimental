@@ -8,11 +8,19 @@ Sanders, Schubert, Gallegos, Integral formulation of shallow-water equations
 with anisotropic porosity for urban flood modeling, J.Hydrol. (2008) 362, 19-38.
 
 
+
+Usage examples:
+
+python run_urbancenter.py --res 80 --breaklines
+python run_urbancenter.py --res 80 --breaklines --hires 10
+python run_urbancenter.py --res 80 --subgrid
+python 
+
 """
 
 # testing options:
 
-display_figure = True # whether to show a diagram of the scenario
+display_figure = False # whether to show a diagram of the scenario
 display_points = 5000 # number of elevation samples
 
 
@@ -22,9 +30,9 @@ display_points = 5000 # number of elevation samples
 
 method = 'DE1' # method might be discontinuous-elevation (DE1) or subgrid (DE_SG).
 
-mesh_resolution = 800 #0.5*(50)**2   # m^2, maximum triangle area
+mesh_resolution = 950 #0.5*(50)**2   # m^2, maximum triangle area
 
-higher_resolution_near_centre = 50 # None, or value in m^2. Say, 10
+higher_resolution_near_centre = None # None, or value in m^2. Say, 10
 higher_resolution_padding_width = 50 # m, width of padding of hi-res region
 
 breaklines_around_buildings = False # Boolean, whether the mesh should conform with urban planning
@@ -279,11 +287,14 @@ Run the simulation
 
 """
 
+
 t1 = simulation_time 
-#t1 = 30 # quicker debugging
+t1 = 30 # quicker debugging
 
 for t in domain.evolve(yieldstep=50,finaltime=t1):
   print domain.timestepping_statistics()
+  print domain.timestep_fluxcalls, domain.max_flux_update_frequency, domain._order_, domain.default_order
+
 
 
 """
