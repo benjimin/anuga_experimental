@@ -33,12 +33,12 @@ chan_width = 5. # Bankfull width of the channel
 bankwidth = 2. # Width of the bank regions -- note that these protrude into the channel
 man_n=0.03 # Manning's n
 l0 = 15 # Length scale associated with triangle side length in channel (min_triangle area = 0.5*l0^2)
-#l0 = 2
+#l0 = 5
 
 flow_in_yval = 5.0 # y-value of line along which the input discharge is passed
 #Qin = 0.5 # Input discharge
 
-flow_algorithm = 'DE_SG'
+flow_algorithm = 'DE1'
 reference_gradient_type = 'bed-slope'
 
 drain_count = 3
@@ -180,7 +180,7 @@ if __name__ == '__main__':
         domain.subgrid_data.make_subgrid_tables(
             topography, frictionFun, 
             approx_grid_spacing=[5.0,5.0], 
-            max_reference_depth=10., 
+            max_reference_depth=50., 
             constant_subgrid_values=False,
             reference_gradient_type='bed-slope') 
             #reference_gradient_type='zero')        
@@ -222,7 +222,7 @@ if __name__ == '__main__':
 
     #domain.CFL=0.1
 
-    for t in domain.evolve(yieldstep=5.0,finaltime=100*60.0):
+    for t in domain.evolve(yieldstep=5.0,finaltime=100*40.0):
         print domain.time, domain.edge_timestep.min()
         domain.report_water_volume_statistics()
         #domain.report_cells_with_small_local_timestep()
