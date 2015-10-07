@@ -20,9 +20,9 @@ from anuga import create_domain_from_regions
 # Useful parameters for controlling this case
 #------------------------------------------------------------------------------
 
-stage_rel_to_plain = -0.05 # Target steady state analytic water depth
-drain_depth = -1
-filename='drainage'
+stage_rel_to_plain = 0.1 # Target steady state analytic water depth
+drain_depth = -0.5
+filename='drainage-new'
 
 floodplain_length = 1000.0 # Model domain length
 floodplain_width = 100.0 # Model domain width
@@ -38,7 +38,7 @@ l0 = 15 # Length scale associated with triangle side length in channel (min_tria
 flow_in_yval = 5.0 # y-value of line along which the input discharge is passed
 #Qin = 0.5 # Input discharge
 
-flow_algorithm = 'DE1'
+flow_algorithm = 'DE_SG'
 reference_gradient_type = 'bed-slope'
 
 drain_count = 3

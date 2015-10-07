@@ -289,11 +289,11 @@ Run the simulation
 
 
 t1 = simulation_time 
-t1 = 30 # quicker debugging
+#t1 = 30 # quicker debugging
 
 for t in domain.evolve(yieldstep=50,finaltime=t1):
   print domain.timestepping_statistics()
-  print domain.timestep_fluxcalls, domain.max_flux_update_frequency, domain._order_, domain.default_order
+  #print domain.timestep_fluxcalls, domain.max_flux_update_frequency, domain._order_, domain.default_order
 
 
 

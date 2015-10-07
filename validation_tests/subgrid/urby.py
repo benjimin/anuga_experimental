@@ -1,21 +1,41 @@
+path = "~/short/jobs/urban_centre/all/"
+
+names = ['urban_DE1_160.sww',
+'urban_DE1_300.sww',
+'urban_DE1_500.sww',
+'urban_DE1_750.sww',
+'urban_DE1_80.sww',
+'urban_DE1_80_10.sww',
+'urban_DE1_80_20.sww',
+'urban_DE1_80_22.sww',
+'urban_DE1_950.sww',
+'urban_DE1b_160.sww',
+'urban_DE1b_300.sww',
+'urban_DE1b_500.sww',
+'urban_DE1b_750.sww',
+'urban_DE1b_80.sww',
+'urban_DE1b_80_10.sww',
+'urban_DE1b_80_20.sww',
+'urban_DE1b_80_22.sww',
+'urban_DE1b_950.sww',
+'urban_SG_160.sww',
+'urban_SG_300.sww',
+'urban_SG_500.sww',
+'urban_SG_750.sww',
+'urban_SG_80.sww',
+'urban_SG_80_10.sww',
+'urban_SG_80_20.sww',
+'urban_SG_80_22.sww',
+'urban_SG_950.sww']
+
+
+fns = [path+n for n in names]
+
+
 import numpy as np
 import matplotlib.pyplot as plt
-
-
-filename = 'urban_DE1b_2000_100.sww'
-
-
-"""
-Load prepared data
-"""
-
-
+from math import pi
 from anuga import plot_utils as util
-v = util.get_output(filename, timeSlices='last') # vertex data
-c = util.get_centroids(filename, timeSlices='last') # centroid data
-# Note, x/y/elev are already squeezed, unlike stage/height.
-
-print "Simulated (final) time is {0} seconds".format(c.time[-1])
 
 """
 Utilities
@@ -47,32 +67,8 @@ def interpolate(vertex_data, centroid_values=None, vertex_values=None, method='l
     if vertex_values is None: vertex_values = smooth_centroids_to_vertices(centroid_values,triplets)
     f = mtri.CubicTriInterpolator if method=='cubic' else mtri.LinearTriInterpolator
     return lambda x,y,f=f(T,vertex_values): f(x,y)
-
-
-
-"""
-Design specific plots
-"""
-
-
-
-def elevations(ax):
-  #plt.title('Elevation')
-  #plt.scatter(v.x,v.y)
-  plt.tripcolor(v.x,v.y,v.vols,v.elev,shading='gouraud',alpha=0.5)
-  
-def triangulation(ax,**opts):
-  plt.title('Final water depth')
-  plt.tripcolor(v.x,v.y,v.vols,v.stage[0],shading='gouraud',alpha=0.8,**opts)
-  plt.colorbar()
-  plt.quiver(c.x,c.y,c.xvel,c.yvel,alpha=0.5)
-  
-def closeup(ax):
-  triangulation(ax,cmap='gist_rainbow_r',vmax=1.15,vmin=0.65)
-  ax.set_xlim(550,950)
-  ax.set_ylim(75,425)
-  
-def transect(ax):
+    
+def transect(ax,filename,npoints=10**5,method='stepwise'):
   """
   This looks at values along a circle enclosing the town
   
@@ -89,49 +85,34 @@ def transect(ax):
   Let the circle have padding akin to the minimum gap between
   the buildings, which is 30-max(10,20).
   """
+  v = util.get_output(filename, timeSlices='last') # vertex data
+  c = util.get_centroids(filename, timeSlices='last') # centroid data  
+  
   padding = 10
   w,h = (5-1)*30+10, (5-1)*30+20
   radius = 0.5*(w**2+h**2)**0.5 + padding
-  npoints = 10**5
-  interp = interpolate(v,centroid_values=c.elev,method='stepwise') # <---
-  from math import pi
+  interp = interpolate(v,centroid_values=c.elev,method=method) 
+ 
   theta = np.linspace(0,2*pi,npoints)
   X = radius*np.cos(theta)+750
   Y = radius*np.sin(theta)+250
   Z = interp(X,Y)
   
-  elevations(ax) # do basemap
-  plt.plot(X,Y,color='k')
-  #plt.title('transect')
-  plt.colorbar(orientation='horizontal',label='Elevation (m)')
+  return theta,Z    
   
-  fig=plt.figure()
-  plt.plot(theta,Z,color='k')
-  plt.xlabel('bearing')
-  plt.ylabel('stage')
-  
-  
-
-
 """
-Orchestrate plots
+Orchestrate plotting
 """
 
-def plot():
-  fig = plt.figure()
-  ax = fig.add_subplot(111,aspect='equal')
-  limits = lambda x: (min(x),max(x))
-  ax.set_xlim(*limits(v.x))
-  ax.set_ylim(*limits(v.y))
-  return ax 
+
+fig,axes = plt.subplots(nrows=3,ncols=9)
+
+
+#for ax,f in zip([i for ii in axes for i in ii], fns):
+ax = axes[1]
+f = fns[1]
+x,y = transect(ax,f)
+ax.plot(x,y)
   
-def plots(*args):
-  for func in args:
-     func(plot())
-  plt.show()
-
-
-#plots(elevations,triangulation,closeup,transect)
-plots(transect)
-
-
+  
+plt.show()
